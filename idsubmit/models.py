@@ -3,6 +3,7 @@
 from django.db import models
 from ietf.idtracker.models import Acronym, PersonOrOrgInfo, IRTF, AreaGroup, Area, IETFWG
 import datetime
+import random
 #from ietf.utils import log
 
 class IdSubmissionStatus(models.Model):
@@ -19,22 +20,22 @@ class IdSubmissionDetail(models.Model):
     submission_id = models.AutoField(primary_key=True)
     #temp_id_document_tag = models.IntegerField(editable=False)	# obsolete
     status = models.ForeignKey(IdSubmissionStatus)
-    last_updated_date = models.DateField()
-    last_updated_time = models.CharField()
-    id_document_name = models.CharField(blank=True, maxlength=255)
-    group_acronym_id = models.IntegerField(null=True, blank=True)
+    last_updated_date = models.DateField(blank=True)
+    last_updated_time = models.CharField(blank=True)
+    title = models.CharField(maxlength=255, db_column='id_document_name')
+    group = models.ForeignKey(Acronym, db_column='group_acronym_id')
     filename = models.CharField(maxlength=255)
-    creation_date = models.DateField(default=datetime.date.today)
-    submission_date = models.DateField(null=True, blank=True)
+    creation_date = models.DateField(null=True, blank=True)
+    submission_date = models.DateField(default=datetime.date.today)
     remote_ip = models.CharField(blank=True, maxlength=100)
-    revision = models.CharField(blank=True, maxlength=3)
+    revision = models.CharField(blank=True, maxlength=2)
     submitter = models.ForeignKey(PersonOrOrgInfo, db_column='submitter_tag', raw_id_admin=True)
-    auth_key = models.CharField(blank=True, maxlength=255)
+    auth_key = models.CharField(blank=True, maxlength=35)
     idnits_message = models.TextField(blank=True)
-    file_type = models.CharField(blank=True, maxlength=50)
+    file_type = models.CharField(blank=True, maxlength=20)
     comment_to_sec = models.TextField(blank=True)
-    abstract = models.TextField(blank=True)
-    txt_page_count = models.IntegerField(null=True, blank=True)
+    abstract = models.TextField()
+    txt_page_count = models.IntegerField()
     error_message = models.CharField(blank=True, maxlength=255)
     warning_message = models.TextField(blank=True)
     wg_submission = models.IntegerField(null=True, blank=True)
@@ -43,12 +44,14 @@ class IdSubmissionDetail(models.Model):
     man_posted_by = models.CharField(blank=True, maxlength=255)
     first_two_pages = models.TextField(blank=True)
     sub_email_priority = models.IntegerField(null=True, blank=True)
-    invalid_version = models.IntegerField(null=True, blank=True)
-    idnits_failed = models.IntegerField(null=True, blank=True)
-    def save(self):
+    invalid_version = models.BooleanField(default=0)
+    idnits_failed = models.BooleanField(default=0)
+    def save(self,*args,**kwargs):
 	self.last_updated_date = datetime.date.today()
+	self.creation_date = datetime.date.today()
 	self.last_updated_time = datetime.datetime.now().time()
-	super(IdSubmissionDetail, self).save()
+        self.auth_key = ''.join([random.choice('0123456789abcdefghijklmnopqrstuvwxyz') for i in range(35)])
+	super(IdSubmissionDetail, self).save(*args,**kwargs)
     class Meta:
         db_table = 'id_submission_detail'
 
