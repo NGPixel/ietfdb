@@ -45,7 +45,7 @@ submitter.</td></tr></table>
 <table border="0" width="650" id="metadatadraft">
 <tr bgcolor="#ddddff">
   <td width="110"><font face="Arial" size="2">Document:</font></td>
-<td><a href="http://localhost/tempids/{{ meta_data.filename }}-{{ meta_data.revision }}.txt">{{ meta_data.filename }}</a> <a href="display_first_two_pages.cgi?submission_id=####">[View First Two Pages]</a><br></td>
+<td><a href="http://localhost/tempids/{{ meta_data.filename }}-{{ meta_data.revision }}.txt">{{ meta_data.filename }}</a> <a href="/idsubmit/viewfirsttwo/{{ submission_id }}">[View First Two Pages]</a><br></td>
 </tr>
 <tr bgcolor="#ffaaaa">
 <td width="110"><font face="Arial" size="2">Version:</font></td>
@@ -70,7 +70,9 @@ submitter.</td></tr></table>
 </tr>
 
 <tr bgcolor="#ddddff"><td colspan="2">Author(s) Information:</td></tr>
-<tr bgcolor="#ddddff"><td>&nbsp; &nbsp; Author 1:</td> <td>Author Name (author email)</td></tr>
+{% for author in authors_info %}
+<tr bgcolor="#ddddff"><td>&nbsp; &nbsp; Author {{ author.author_order }}:</td> <td>{{ author.name }} ({{ author.email }})</td></tr>
+{% endfor %}
 <tr bgcolor="#ddddff">
 <td><font face="Arial" size="2">Pages:</font></td>
  <td>{{ meta_data.txt_page_count }}</td></font>    </tr>

@@ -18,7 +18,7 @@ def parse_meta_data (id_content):
     not_found = "Not Found"
     filesize = len(id_content)
     #extract filename and revision
-    filename_re = re.search('\n {3,}<{0,1}((draft-.+)-(\d\d)).+\n',id_content)
+    filename_re = re.search('\n {3,}<{0,1}((draft-.+)-(\d\d)).*\n',id_content)
     try: 
         filename = filename_re.group(2)
         ## Need to check for invalid characters in filename here ##
@@ -32,7 +32,7 @@ def parse_meta_data (id_content):
     #get first two pages
     first_two_pages = pages[0] + pages[1]
     #extract title
-    headers_re = re.compile('\n {3,}<{0,1}((draft-.+)-(\d\d)).+\n')
+    headers_re = re.compile('\n {3,}<{0,1}draft-.+\n')
     id_content = headers_re.sub('',id_content)
     title_re = re.search('\n{2,}(( +\w+.+\n)+)\n*Status of ',id_content)
     try: 
@@ -65,8 +65,8 @@ def parse_meta_data (id_content):
     except AttributeError: creation_date = not_found 
     ## creation_date needs to be formated here? ##
     #extract authors' name and email
-    #authors_info = []
-    authors_section = re.search('\nAuthor.+\n+(( {3,}.+\n+)+)',id_content)
+    authors_section = re.search('Author\'{0,1} {0,1}s{0,1}\'{0,1} {0,1}s{0,1} {0,1}Address[es]{0,2} {0,1}:{0,1}\n+(( {3,}.+\n+)+)',id_content)
+    #authors_section = re.search('\nAuthor.+\n+(( {3,}.+\n+)+)',id_content)
     try: authors_info = authors_section.group(1)
     except AttributeError: authors_info = not_found
     wg =  group = Acronym.objects.get(acronym='none')
@@ -84,6 +84,29 @@ def parse_meta_data (id_content):
     }
     return {'result':1,'authors_info':authors_info, 'meta_data_fields':meta_data_fields}
 
+def get_authors(authors_info):
+    authors_re = re.compile(' {2,}')
+    authors_info = authors_re.sub('',authors_info)
+    authors_re = re.compile('\n+(Email|Phone|Fax|URI)',re.I)
+    authors_info = authors_re.sub('\n',authors_info)
+    authors_re = re.compile('\s+$')
+    authors_info = authors_re.sub('',authors_info)
+    authors_re = re.compile('\n{2,}')
+    authors_info = authors_re.sub('[sep]',authors_info)
+    authors = authors_info.split('[sep]')
+    authors_dict = []
+    author_order = 0
+    for chunk in authors:
+        author_order += 1
+        name_line_re = re.search('^.+',chunk)
+        try: name_line = name_line_re.group()
+        except AttributeError:name_line="Not Found"
+        email_re = re.search('\S+@\S+',chunk)
+        try:email = email_re.group()
+        except AttributeError: email="Not Found"
+        authors_dict.append({'name':name_line,'email':email,'author_order':author_order})
+    return authors_dict
+
 def file_upload(request):
     #form = NONE
     if request.POST:
@@ -99,15 +122,17 @@ def file_upload(request):
                                {'error_msg':"Not plain text"})
             data = parse_meta_data(content)
             meta_data = data['meta_data_fields']
+            authors_info = data['authors_info']
+            authors_info = get_authors(authors_info)
             if data['result']:
                 content = form.save(meta_data['filename'],meta_data['revision'])
                 list = IdSubmissionDetail(**meta_data)
-                try: list.save()
+                try: submission_id=list.save()
                 except AttributeError:
                     return  render("idsubmit/error.html",\
                                {'error_msg':"Data Saving Error"})
                 pass
-            return render("idsubmit/validate.html",{'meta_data':meta_data})
+            return render("idsubmit/validate.html",{'meta_data':meta_data, 'submission_id':submission_id, 'authors_info':authors_info})
         else:
             form = IDUploadForm()
     else:

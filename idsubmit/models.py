@@ -52,6 +52,7 @@ class IdSubmissionDetail(models.Model):
 	self.last_updated_time = datetime.datetime.now().time()
         self.auth_key = ''.join([random.choice('0123456789abcdefghijklmnopqrstuvwxyz') for i in range(35)])
 	super(IdSubmissionDetail, self).save(*args,**kwargs)
+        return self.submission_id
     class Meta:
         db_table = 'id_submission_detail'
 
@@ -105,5 +106,9 @@ class TempIdAuthors(models.Model):
     last_modified_time = models.CharField(blank=True, maxlength=100)
     author_order = models.IntegerField(default=0)
     submission = models.ForeignKey(IdSubmissionDetail)
+    def save(self,*args,**kwargs):
+        self.last_modified_date = datetime.date.today()
+        self.last_modified_time = datetime.datetime.now().time()
+        super(TempIdAuthors, self).save(*args,**kwargs)
     class Meta:
         db_table = 'temp_id_authors'

@@ -14,7 +14,7 @@ class IDUploadForm(forms.Form):
 
     def save(self,filename,revision):
         file_content = self.clean_data['txt_file']['content']
-        output_id = open('/home/mlee/tempids/'+filename+'-'+revision+'.txt','w')
+        output_id = open('/Library/WebServer/Documents/tempids/'+filename+'-'+revision+'.txt','w')
         output_id.write(file_content)
         output_id.close()
         for extra_type in [{'file_type':'xml_file','file_ext':'.xml'}, {'file_type':'pdf_file','file_ext':'.pdf'},{'file_type':'ps_file','file_ext':'.ps'}]:
