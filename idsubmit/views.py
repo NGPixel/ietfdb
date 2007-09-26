@@ -2,7 +2,7 @@
 
 # Create your views here.
 #import models
-from models import IdSubmissionDetail
+from models import IdSubmissionDetail, IdSubmissionEnv
 from ietf.idtracker.models import Acronym, IETFWG, InternetDraft
 from django.shortcuts import render_to_response as render, get_object_or_404
 #from ietf.proceedings.models import Meeting, Switches
@@ -132,7 +132,9 @@ def file_upload(request):
                     return  render("idsubmit/error.html",\
                                {'error_msg':"Data Saving Error"})
                 pass
-            return render("idsubmit/validate.html",{'meta_data':meta_data, 'submission_id':submission_id, 'authors_info':authors_info})
+            env = get_object_or_404(IdSubmissionEnv)
+            staging_url = env.staging_url
+            return render("idsubmit/validate.html",{'meta_data':meta_data, 'submission_id':submission_id, 'authors_info':authors_info, 'staging_url':staging_url})
         else:
             form = IDUploadForm()
     else:

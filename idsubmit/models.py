@@ -21,7 +21,7 @@ class IdSubmissionDetail(models.Model):
     #temp_id_document_tag = models.IntegerField(editable=False)	# obsolete
     status = models.ForeignKey(IdSubmissionStatus)
     last_updated_date = models.DateField(blank=True)
-    last_updated_time = models.CharField(blank=True)
+    last_updated_time = models.CharField(maxlength=100,blank=True)
     title = models.CharField(maxlength=255, db_column='id_document_name')
     group = models.ForeignKey(Acronym, db_column='group_acronym_id')
     filename = models.CharField(maxlength=255)
@@ -56,7 +56,6 @@ class IdSubmissionDetail(models.Model):
     class Meta:
         db_table = 'id_submission_detail'
 
-# No primary key.  django doesn't like that.  Ponder what to do about that.
 class IdSubmissionEnv(models.Model):
     max_live = models.IntegerField(null=True, blank=True)
     staging_path = models.CharField(blank=True, maxlength=255)
@@ -83,6 +82,10 @@ class IdSubmissionEnv(models.Model):
     max_daily_submission_size = models.IntegerField(null=True, blank=True)
     class Meta:
         db_table = 'id_submission_env'
+        verbose_name="I-D Submission Tool Environment Variables"
+        verbose_name_plural="I-D Submission Tool Environment Variables"
+    class Admin:
+        pass
 
 class IdApprovedDetail(models.Model):
     filename = models.CharField(blank=True, maxlength=255)

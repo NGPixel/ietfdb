@@ -120,6 +120,7 @@ INSTALLED_APPS = (
     'ietf.agenda',
     'ietf.announcements',
     'ietf.idindex',
+    'ietf.idsubmit',
     'ietf.idtracker',
     'ietf.ietfauth',
     'ietf.iesg',

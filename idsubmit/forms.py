@@ -1,6 +1,8 @@
 # Copyright The IETF Trust 2007, All Rights Reserved
 
 from django import newforms as forms
+from django.shortcuts import get_object_or_404
+from models import IdSubmissionEnv
 
 class IDUploadForm(forms.Form):
     txt_file = forms.Field(widget=forms.FileInput(), label='.txt format *')
@@ -14,7 +16,9 @@ class IDUploadForm(forms.Form):
 
     def save(self,filename,revision):
         file_content = self.clean_data['txt_file']['content']
-        output_id = open('/Library/WebServer/Documents/tempids/'+filename+'-'+revision+'.txt','w')
+        env = get_object_or_404(IdSubmissionEnv)
+        staging_path = env.staging_path
+        output_id = open(staging_path+filename+'-'+revision+'.txt','w')
         output_id.write(file_content)
         output_id.close()
         for extra_type in [{'file_type':'xml_file','file_ext':'.xml'}, {'file_type':'pdf_file','file_ext':'.pdf'},{'file_type':'ps_file','file_ext':'.ps'}]:
@@ -22,7 +26,7 @@ class IDUploadForm(forms.Form):
             file_ext=extra_type['file_ext']
             if self.clean_data[file_type]:
                 extra_file_content = self.clean_data[file_type]['content']
-                extra_output_id = open('/home/mlee/tempids/'+filename+'-'+revision+file_ext,'w')
+                extra_output_id = open(staging_path+filename+'-'+revision+file_ext,'w')
                 extra_output_id.write(extra_file_content)
                 extra_output_id.close()
         return 1
