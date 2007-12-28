@@ -3,7 +3,7 @@
 from django.db import models
 from ietf.utils import FKAsOneToOne
 from django.test import TestCase
-import datetime
+import datetime,time
 
 class Acronym(models.Model):
     acronym_id = models.AutoField(primary_key=True)
@@ -770,10 +770,12 @@ class IETFWG(models.Model):
     def active_drafts(self):
 	return self.group_acronym.internetdraft_set.all().filter(status__status="Active")
     def choices():
-	return [(wg.group_acronym_id, wg.group_acronym.acronym) for wg in IETFWG.objects.all().filter(group_type__type='WG').select_related().order_by('acronym.acronym')]
+	return [(wg.group_acronym_id, wg.group_acronym.acronym) for wg in IETFWG.objects.all().filter(group_type__type='WG', status=1).select_related().order_by('acronym.acronym').distinct()]
     choices = staticmethod(choices)
     def area_acronym(self):
-        return AreaGroup.objects.filter(group_acronym_id=self.group_acronym_id).area 
+        return AreaGroup.objects.filter(group_acronym_id=self.group_acronym_id).area
+    def is_meeting(self, meeting_num):
+        return NotMeetingGroups.objects.filter(group=self.group_acronym_id, meeting=meeting_num).count() == 0
     class Meta:
         db_table = 'groups_ietf'
 	ordering = ['?']	# workaround django wanting to sort by acronym but not joining with it
@@ -783,6 +785,33 @@ class IETFWG(models.Model):
 	list_display = ('group_acronym', 'group_type', 'status', 'area_director')
 	list_filter = ['status', 'group_type', 'area_director']
 	pass
+
+    def get_chairs(self):
+        chairs = []
+        # If IRTF group
+        if self.group_acronym_id < 50:
+            # Get IRTF chair
+            chairs += [ person_or_org for person_or_org in PersonOrOrgInfo.objects.filter(role__role_name='IRTF') ]
+            chairs += [ person_or_org for person_or_org in PersonOrOrgInfo.objects.filter(irtfchair__irtf=self.group_acronym_id).exclude(person_or_org_tag=person.person_or_org_tag) ]
+        # Else regular WG
+        else:
+            chairs = [ person_or_org for person_or_org in PersonOrOrgInfo.objects.filter(wgchair__group_acronym=self.group_acronym_id) ]
+        return chairs
+
+    # Get the area directors
+    def directors(self):
+        return [ director.person for director in AreaDirector.objects.filter(area=AreaGroup.objects.get(group=self.group_acronym_id).area) ]
+
+class SessionRequestActivities(models.Model):
+    id = models.IntegerField(primary_key=True)
+    group_acronym_id = models.IntegerField(null=True, blank=True)
+    meeting_num = models.IntegerField(null=True, blank=True)
+    activity = models.TextField(blank=True)
+    act_date = models.DateField(null=True, blank=True, default=datetime.date.today())
+    act_time = models.CharField(blank=True, maxlength=100, default=time.strftime('%H:%M:%S'))
+    person = models.ForeignKey(PersonOrOrgInfo, db_column='act_by', raw_id_admin=True)
+    class Meta:
+        db_table = 'session_request_activities'
 
 class WGChair(models.Model):
     person = models.ForeignKey(PersonOrOrgInfo, db_column='person_or_org_tag', raw_id_admin=True, unique=True, core=True)
@@ -933,6 +962,12 @@ class IRTFChair(models.Model):
         db_table = 'irtf_chairs'
     class Admin:
 	pass
+
+class NotMeetingGroups(models.Model):
+    group = models.IntegerField(db_column='group_acronym_id', null=True, blank=True)
+    meeting = models.IntegerField(db_column='meeting_num', null=True, blank=True)
+    class Meta:
+        db_table = 'not_meeting_groups'
 
 # Not a model, but it's related.
 # This is used in the view to represent documents

@@ -145,6 +145,12 @@ class NonSession(models.Model):
     class Meta:
 	db_table = 'non_session'
 
+class SessionStatus(models.Model):
+    status_id = models.IntegerField(primary_key=True)
+    status = models.CharField(blank=True, maxlength=100)
+    class Meta:
+        db_table = 'session_status'
+
 class Proceeding(models.Model):
     meeting_num = models.ForeignKey(Meeting, db_column='meeting_num', unique=True, primary_key=True)
     dir_name = models.CharField(blank=True, maxlength=25)
@@ -272,15 +278,21 @@ class MeetingRoom(models.Model):
     class Admin:
 	pass
 
+class MeetingHours(models.Model):
+    hour_id = models.IntegerField(primary_key=True)
+    hour_desc = models.CharField(blank=True, maxlength=20)
+    class Meta:
+        db_table = 'meeting_hours'
+
 class WgMeetingSession(models.Model, ResolveAcronym):
     session_id = models.AutoField(primary_key=True)
     meeting = models.ForeignKey(Meeting, db_column='meeting_num')
     group_acronym_id = models.IntegerField()
     irtf = models.BooleanField()
     num_session = models.IntegerField()
-    length_session1 = models.CharField(blank=True, maxlength=100)
-    length_session2 = models.CharField(blank=True, maxlength=100)
-    length_session3 = models.CharField(blank=True, maxlength=100)
+    length_session1 = models.OneToOneField(MeetingHours, db_column='length_session1', related_name='length1')
+    length_session2 = models.OneToOneField(MeetingHours, db_column='length_session2', related_name='length2')
+    length_session3 = models.OneToOneField(MeetingHours, db_column='length_session3', related_name='length3')
     conflict1 = models.CharField(blank=True, maxlength=255)
     conflict2 = models.CharField(blank=True, maxlength=255)
     conflict3 = models.CharField(blank=True, maxlength=255)
@@ -289,6 +301,7 @@ class WgMeetingSession(models.Model, ResolveAcronym):
     number_attendee = models.IntegerField(null=True, blank=True)
     approval_ad = models.IntegerField(null=True, blank=True)
     status_id = models.IntegerField(null=True, blank=True)
+    status = models.ForeignKey(SessionStatus, db_column='status_id',blank=True)
     ts_status_id = models.IntegerField(null=True, blank=True)
     requested_date = models.DateField(null=True, blank=True)
     approved_date = models.DateField(null=True, blank=True)
