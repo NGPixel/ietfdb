@@ -11,7 +11,7 @@
 {% block content %}
 
 <h2><center>IETF Meeting Session Request Tool</center></h2>
-
+<blockquote>
 <h3>IETF {{meeting_num}}: Confirmation</h3>
 <hr/>
 
@@ -23,7 +23,7 @@
 {{session.num_session}}
 </td></tr>
 
-<tr bgcolor="#eeeeee"><td valign="top">Length of Session 1:</td><td>{{session.length_session1.hour_desc}}</td></tr>
+<tr bgcolor="#eeeeee"><td valign="top">Length of Session 1:</td><td>{{session.length_session1}}</td></tr>
 {% if session.length_session2 %}
 <tr bgcolor="#eeeeee"><td valign="top">Length of Session 2:</td><td>{{session.length_session2.hour_desc}}</td></tr>
 {% endif %}
@@ -34,8 +34,17 @@
 <tr bgcolor="#cccccc"><td>Number of Attendees:</td><td>
 {{session.number_attendee}}
 </td></tr>
-
-<tr bgcolor="#eeeeee"><td valign="top">Special Requests:</td>
+<tr bgcolor="#eeeeee"><td valign="top">Conflicts to Avoid:</td>
+<td>
+<table border="0">
+{% if session.conflict1 %}<tr><td>First Priority:</td><td>{{session.conflict1}}</td></tr>{% endif %}
+{% if session.conflict2 %}<tr><td>Second Priority:</td><td>{{session.conflict2}}</td></tr>{% endif %}
+{% if session.conflict3 %}<tr><td>Third Priority:</td><td>{{session.conflict3}}</td></tr>{% endif %}
+{% if session.conflict_other %}<tr><td>BOF or IRTF Sessions:</td><td>{{session.conflict_other|escape|linebreaksbr}}</td></tr>{% endif %}
+</table>
+</td>
+</tr>
+<tr bgcolor="#cccccc"><td valign="top">Special Requests:</td>
 <td>
 {{session.special_req|escape|linebreaksbr}}
 </td>
@@ -44,15 +53,17 @@
 <br/>
 <form method="post">
 {% if session.length_session3 %}
+  {% ifequal session.ts_status_id 2 %}
 <b>Note: Your request for a third session must be approved by an area director before being submitted to agenda@ietf.org.</b> 
 <input name="confirm" type="submit" value="Submit your request to the IETF Agenda and the Transport Area Directors for third session approval">
+  {% endifequal %}
 {% else %}
 <input name="confirm" type="submit" value="Submit your request to the IETF Agenda">
 {% endif %}
 </form>
 <br/>
-<form action="../../request">
-<input type="submit" value="User's First Screen">
-</form>
-
 {% endblock %}
+{% block local_footer %}
+{% include "meeting/local_footer.html" %}
+{% endblock %}
+</blockquote>
