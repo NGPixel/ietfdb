@@ -132,7 +132,7 @@ class InternetDraft(models.Model):
     start_date = models.DateField()
     expiration_date = models.DateField()
     abstract = models.TextField()
-    dunn_sent_date = models.DateField()
+    dunn_sent_date = models.DateField(null=True, blank=True)
     extension_date = models.DateField(null=True, blank=True)
     status = models.ForeignKey(IDStatus)
     intended_status = models.ForeignKey(IDIntendedStatus)
@@ -160,6 +160,12 @@ class InternetDraft(models.Model):
 	else:
 	    css="active"
         return '<span class="' + css + '">' + self.filename + '</span>'
+    def displayname_current(self):
+	if self.status.status == "Replaced":
+	    css="replaced"
+	else:
+	    css="active"
+        return '<span class="%s">%s-%s</span>' % (css, self.filename, self.revision)
     def displayname_with_link(self):
 	if self.status.status == "Replaced":
 	    css="replaced"
@@ -168,6 +174,8 @@ class InternetDraft(models.Model):
 	return '<a class="' + css + '" href="%s">%s</a>' % ( self.doclink(), self.filename )
     def doclink(self):
 	return "http://" + settings.TOOLS_SERVER + "/html/%s" % ( self.filename )
+    def doclink_current(self):
+	return "http://%s/html/%s-%s" % (settings.TOOLS_SERVER, self.filename, self.revision)
     def group_acronym(self):
 	return self.group.acronym
     def __str__(self):
@@ -808,7 +816,17 @@ class IETFWG(models.Model):
 	return [(wg.group_acronym_id, wg.group_acronym.acronym) for wg in IETFWG.objects.all().filter(group_type__type='WG').select_related().order_by('acronym.acronym')]
     choices = staticmethod(choices)
     def area_acronym(self):
-        return AreaGroup.objects.filter(group_acronym_id=self.group_acronym_id).area 
+        areas = AreaGroup.objects.filter(group__exact=self.group_acronym)
+        if areas:
+            return areas[areas.count()-1].area.area_acronym
+        else:
+            return None
+    def area_directors(self):
+        areas = AreaGroup.objects.filter(group__exact=self.group_acronym)
+        if areas:
+            return areas[areas.count()-1].area.areadirector_set.all()
+        else:
+            return None
     class Meta:
         db_table = 'groups_ietf'
 	ordering = ['?']	# workaround django wanting to sort by acronym but not joining with it
@@ -817,7 +835,7 @@ class IETFWG(models.Model):
 	search_fields = ['group_acronym__acronym', 'group_acronym__name']
 	# Until the database is consistent, including area_director in
 	# this list means that we'll have FK failures, so skip it for now.
-	list_display = ('group_acronym', 'group_type', 'status')
+	list_display = ('group_acronym', 'group_type', 'status', 'area_acronym', 'start_date', 'concluded_date')
 	list_filter = ['status', 'group_type']
 	#list_display = ('group_acronym', 'group_type', 'status', 'area_director')
 	#list_filter = ['status', 'group_type', 'area_director']
