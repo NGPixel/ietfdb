@@ -135,6 +135,13 @@ INSTALLED_APPS = (
     'ietf.my',
     'ietf.proceedings',
     'ietf.redirects',
+
+    'redesign.person',
+    'redesign.doc',
+    'redesign.name',
+    'redesign.group',
+#    'redesign.issue',
+    
 # not yet merged from the Vancouver branch    
 #    'ietf.wgcharter',
 )
