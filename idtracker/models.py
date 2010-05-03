@@ -1,16 +1,18 @@
 # Copyright The IETF Trust 2007, All Rights Reserved
 
+import os.path
+import datetime
+import re
+
 from django.conf import settings
 from django.db import models
 from ietf.utils import FKAsOneToOne
-from django.test import TestCase
-import datetime
 
 class Acronym(models.Model):
     acronym_id = models.AutoField(primary_key=True)
-    acronym = models.CharField(maxlength=12)
-    name = models.CharField(maxlength=100)
-    name_key = models.CharField(maxlength=50, editable=False)
+    acronym = models.CharField(max_length=12)
+    name = models.CharField(max_length=100)
+    name_key = models.CharField(max_length=50, editable=False)
     def save(self):
         self.name_key = self.name.upper()
 	super(Acronym, self).save()
@@ -18,24 +20,21 @@ class Acronym(models.Model):
         return self.acronym
     class Meta:
         db_table = "acronym"
-    class Admin:
-        list_display = ('acronym', 'name')
-        pass
 
 class AreaStatus(models.Model):
     status_id = models.AutoField(primary_key=True)
-    status = models.CharField(maxlength=25, db_column='status_value')
+    status = models.CharField(max_length=25, db_column='status_value')
     def __str__(self):
 	return self.status
     class Meta:
+        verbose_name = "Area Status"
+        verbose_name_plural = "Area Statuses"
         db_table = 'area_status'
-    class Admin:
-        pass
 
 # I think equiv_group_flag is historical.
 class IDState(models.Model):
     document_state_id = models.AutoField(primary_key=True)
-    state = models.CharField(maxlength=50, db_column='document_state_val')
+    state = models.CharField(max_length=50, db_column='document_state_val')
     equiv_group_flag = models.IntegerField(null=True, blank=True)
     description = models.TextField(blank=True, db_column='document_desc')
     def __str__(self):
@@ -46,31 +45,25 @@ class IDState(models.Model):
     class Meta:
         db_table = 'ref_doc_states_new'
 	ordering = ['document_state_id']
-    class Admin:
-	pass
 
 class IDNextState(models.Model):
     cur_state = models.ForeignKey(IDState, related_name='nextstate')
-    next_state = models.ForeignKey(IDState, related_name='prevstate', core=True)
-    condition = models.CharField(blank=True, maxlength=255)
+    next_state = models.ForeignKey(IDState, related_name='prevstate')
+    condition = models.CharField(blank=True, max_length=255)
     def __str__(self):
 	return "%s -> %s" % (self.cur_state.state, self.next_state.state )
     class Meta:
         db_table = 'ref_next_states_new'
-    class Admin:
-	pass
 
 class IDSubState(models.Model):
     sub_state_id = models.AutoField(primary_key=True)
-    sub_state = models.CharField(maxlength=55, db_column='sub_state_val')
+    sub_state = models.CharField(max_length=55, db_column='sub_state_val')
     description = models.TextField(blank=True, db_column='sub_state_desc')
     def __str__(self):
         return self.sub_state
     class Meta:
         db_table = 'sub_state'
 	ordering = ['sub_state_id']
-    class Admin:
-	pass
 
 class Area(models.Model):
     ACTIVE=1
@@ -80,73 +73,83 @@ class Area(models.Model):
     status = models.ForeignKey(AreaStatus)
     comments = models.TextField(blank=True)
     last_modified_date = models.DateField(auto_now=True)
-    extra_email_addresses = models.TextField(blank=True)
+    extra_email_addresses = models.TextField(blank=True,null=True)
     def __str__(self):
 	return self.area_acronym.acronym
-    def active_area_choices():
-	return [(area.area_acronym_id, area.area_acronym.acronym) for area in Area.objects.filter(status=1).select_related().order_by('acronym.acronym')]
-    active_area_choices = staticmethod(active_area_choices)
+    def additional_urls(self):
+        return AreaWGURL.objects.filter(name=self.area_acronym.name)
+    def active_wgs(self):
+        return IETFWG.objects.filter(group_type=1,status=IETFWG.ACTIVE,areagroup__area=self).order_by('group_acronym__acronym')
+    def active_areas():
+        return Area.objects.filter(status=Area.ACTIVE).order_by('area_acronym__acronym')
+    active_areas = staticmethod(active_areas)
     class Meta:
         db_table = 'areas'
 	verbose_name="area"
-    class Admin:
-        list_display = ('area_acronym', 'status')
-	pass
+
+class AreaWGURL(models.Model):
+    id = models.AutoField(primary_key=True, db_column='area_ID')
+    # For WGs, this is the WG acronym; for areas, it's the area name.
+    name = models.CharField(max_length=50, db_column='area_Name')
+    url = models.CharField(max_length=50)
+    description = models.CharField(max_length=50)
+    def __unicode__(self):
+        return u'%s (%s)' % (self.name, self.description)
+    class Meta:
+        ordering = ['name']
+        verbose_name = "Area/WG URL"
+        db_table = "wg_www_pages"
 
 class IDStatus(models.Model):
     status_id = models.AutoField(primary_key=True)
-    status = models.CharField(maxlength=25, db_column='status_value')
+    status = models.CharField(max_length=25, db_column='status_value')
     def __str__(self):
         return self.status
     class Meta:
         db_table = "id_status"
 	verbose_name="I-D Status"
 	verbose_name_plural="I-D Statuses"
-    class Admin:
-        pass
 
 class IDIntendedStatus(models.Model):
     intended_status_id = models.AutoField(primary_key=True)
-    intended_status = models.CharField(maxlength=25, db_column='status_value')
+    intended_status = models.CharField(max_length=25, db_column='status_value')
     def __str__(self):
         return self.intended_status
     class Meta:
         db_table = "id_intended_status"
 	verbose_name="I-D Intended Publication Status"
 	verbose_name_plural="I-D Intended Publication Statuses"
-    class Admin:
-        pass
 
 class InternetDraft(models.Model):
     DAYS_TO_EXPIRE=185
     id_document_tag = models.AutoField(primary_key=True)
-    title = models.CharField(maxlength=255, db_column='id_document_name')
-    id_document_key = models.CharField(maxlength=255, editable=False)
+    title = models.CharField(max_length=255, db_column='id_document_name')
+    id_document_key = models.CharField(max_length=255, editable=False)
     group = models.ForeignKey(Acronym, db_column='group_acronym_id')
-    filename = models.CharField(maxlength=255, unique=True)
-    revision = models.CharField(maxlength=2)
+    filename = models.CharField(max_length=255, unique=True)
+    revision = models.CharField(max_length=2)
     revision_date = models.DateField()
-    file_type = models.CharField(maxlength=20)
+    file_type = models.CharField(max_length=20)
     txt_page_count = models.IntegerField()
-    local_path = models.CharField(maxlength=255, blank=True)
+    local_path = models.CharField(max_length=255, blank=True, null=True)
     start_date = models.DateField()
-    expiration_date = models.DateField()
+    expiration_date = models.DateField(null=True)
     abstract = models.TextField()
-    dunn_sent_date = models.DateField()
+    dunn_sent_date = models.DateField(null=True, blank=True)
     extension_date = models.DateField(null=True, blank=True)
     status = models.ForeignKey(IDStatus)
     intended_status = models.ForeignKey(IDIntendedStatus)
     lc_sent_date = models.DateField(null=True, blank=True)
-    lc_changes = models.CharField(maxlength=3)
+    lc_changes = models.CharField(max_length=3,null=True)
     lc_expiration_date = models.DateField(null=True, blank=True)
     b_sent_date = models.DateField(null=True, blank=True)
     b_discussion_date = models.DateField(null=True, blank=True)
     b_approve_date = models.DateField(null=True, blank=True)
     wgreturn_date = models.DateField(null=True, blank=True)
     rfc_number = models.IntegerField(null=True, blank=True, db_index=True)
-    comments = models.TextField(blank=True)
+    comments = models.TextField(blank=True,null=True)
     last_modified_date = models.DateField()
-    replaced_by = models.ForeignKey('self', db_column='replaced_by', raw_id_admin=True, blank=True, null=True, related_name='replaces_set')
+    replaced_by = models.ForeignKey('self', db_column='replaced_by', blank=True, null=True, related_name='replaces_set')
     replaces = FKAsOneToOne('replaces', reverse=True)
     review_by_rfc_editor = models.BooleanField()
     expired_tombstone = models.BooleanField()
@@ -155,19 +158,7 @@ class InternetDraft(models.Model):
         self.id_document_key = self.title.upper()
         super(InternetDraft, self).save()
     def displayname(self):
-	if self.status.status == "Replaced":
-	    css="replaced"
-	else:
-	    css="active"
-        return '<span class="' + css + '">' + self.filename + '</span>'
-    def displayname_with_link(self):
-	if self.status.status == "Replaced":
-	    css="replaced"
-	else:
-	    css="active"
-	return '<a class="' + css + '" href="%s">%s</a>' % ( self.doclink(), self.filename )
-    def doclink(self):
-	return "http://" + settings.TOOLS_SERVER + "/html/%s" % ( self.filename )
+        return self.filename
     def group_acronym(self):
 	return self.group.acronym
     def __str__(self):
@@ -183,12 +174,6 @@ class InternetDraft(models.Model):
 	if self.status.status != 'Active' and not self.expired_tombstone:
 	   r = max(r - 1, 0)
 	return "%02d" % r
-    def doctype(self):
-	return "Draft"
-    def filename_with_link(self, text=None):
-	if text is None:
-	    text=self.filename
-	return '<a href="%s">%s</a>' % ( self.doclink(), text )
     def expiration(self):
         return self.revision_date + datetime.timedelta(self.DAYS_TO_EXPIRE)
     def can_expire(self):
@@ -208,47 +193,72 @@ class InternetDraft(models.Model):
                 return False
         return True
 
+    def clean_abstract(self):
+        # Cleaning based on what "id-abstracts-text" script does
+        a = self.abstract
+        a = re.sub(" *\r\n *", "\n", a)  # get rid of DOS line endings
+        a = re.sub(" *\r *", "\n", a)  # get rid of MAC line endings
+        a = re.sub("(\n *){3,}", "\n\n", a)  # get rid of excessive vertical whitespace
+        a = re.sub("\f[\n ]*[^\n]*\n", "", a)  # get rid of page headers
+        # Get rid of 'key words' boilerplate and anything which follows it:
+        # (No way that is part of the abstract...)
+        a = re.sub("(?s)(Conventions [Uu]sed in this [Dd]ocument|Requirements [Ll]anguage)?[\n ]*The key words \"MUST\", \"MUST NOT\",.*$", "", a)
+        # Get rid of status/copyright boilerplate
+        a = re.sub("(?s)\nStatus of [tT]his Memo\n.*$", "", a)
+        # wrap long lines without messing up formatting of Ok paragraphs:
+        while re.match("([^\n]{72,}?) +", a):
+            a = re.sub("([^\n]{72,}?) +([^\n ]*)(\n|$)", "\\1\n\\2 ", a)
+        # Remove leading and trailing whitespace
+        a = a.strip()
+        return a 
+
     class Meta:
         db_table = "internet_drafts"
-    class Admin:
-        search_fields = ['filename','title']
-        list_display = ('filename', 'revision', 'title', 'status')
-	list_filter = ['status']
-        pass
-        #date_hierarchy = 'revision_date'
-        #list_filter = ['revision_date']
 
 class PersonOrOrgInfo(models.Model):
     person_or_org_tag = models.AutoField(primary_key=True)
-    record_type = models.CharField(blank=True, maxlength=8)
-    name_prefix = models.CharField(blank=True, maxlength=10)
-    first_name = models.CharField(blank=True, maxlength=20)
-    first_name_key = models.CharField(blank=True, maxlength=20, editable=False)
-    middle_initial = models.CharField(blank=True, maxlength=4)
-    middle_initial_key = models.CharField(blank=True, maxlength=4, editable=False)
-    last_name = models.CharField(blank=True, maxlength=50)
-    last_name_key = models.CharField(blank=True, maxlength=50, editable=False)
-    name_suffix = models.CharField(blank=True, maxlength=10)
+    record_type = models.CharField(blank=True, null=True, max_length=8)
+    name_prefix = models.CharField(blank=True, null=True, max_length=10)
+    first_name = models.CharField(blank=True, max_length=20)
+    first_name_key = models.CharField(blank=True, max_length=20, editable=False)
+    middle_initial = models.CharField(blank=True, null=True, max_length=4)
+    middle_initial_key = models.CharField(blank=True, null=True, max_length=4, editable=False)
+    last_name = models.CharField(blank=True, max_length=50)
+    last_name_key = models.CharField(blank=True, max_length=50, editable=False)
+    name_suffix = models.CharField(blank=True, null=True, max_length=10)
     date_modified = models.DateField(null=True, blank=True, auto_now=True)
-    modified_by = models.CharField(blank=True, maxlength=8)
-    date_created = models.DateField(auto_now_add=True)
-    created_by = models.CharField(blank=True, maxlength=8)
-    address_type = models.CharField(blank=True, maxlength=4)
+    modified_by = models.CharField(blank=True, null=True, max_length=8)
+    date_created = models.DateField(auto_now_add=True, null=True)
+    created_by = models.CharField(blank=True, null=True, max_length=8)
+    address_type = models.CharField(blank=True, null=True, max_length=4)
     def save(self):
         self.first_name_key = self.first_name.upper()
         self.middle_initial_key = self.middle_initial.upper()
         self.last_name_key = self.last_name.upper()
         super(PersonOrOrgInfo, self).save()
     def __str__(self):
+        # For django.VERSION 0.96
 	if self.first_name == '' and self.last_name == '':
-	    return self.affiliation()
+	    return "(Person #%s)" % self.person_or_org_tag
         return "%s %s" % ( self.first_name or "<nofirst>", self.last_name or "<nolast>")
-    def email(self, priority=1, type='INET'):
+    def __unicode__(self):
+        # For django.VERSION 1.x
+	if self.first_name == '' and self.last_name == '':
+	    return u"(Person #%s)" % self.person_or_org_tag
+        return u"%s %s" % ( self.first_name or u"<nofirst>", self.last_name or u"<nolast>")
+    def email(self, priority=1, type=None):
 	name = str(self)
-	try:
-	    email = self.emailaddress_set.get(priority=priority, type=type).address
-	except (EmailAddress.DoesNotExist, AssertionError):
-	    email = ''
+        email = ''
+        types = type and [ type ] or [ "INET", "Prim", None ]
+        for type in types:
+            try:
+                if type:
+                    email = self.emailaddress_set.get(priority=priority, type=type).address
+                else:
+                    email = self.emailaddress_set.get(priority=priority).address
+                break
+            except (EmailAddress.DoesNotExist, AssertionError):
+                pass
 	return (name, email)
     # Added by Sunny Lee to display person's affiliation - 5/26/2007
     def affiliation(self, priority=1):
@@ -261,20 +271,9 @@ class PersonOrOrgInfo(models.Model):
         return "%s" % ( postal.affiliated_company or postal.department or "???" )
     class Meta:
         db_table = 'person_or_org_info'
-	ordering = ['last_name']
+        ordering = ['last_name']
 	verbose_name="Rolodex Entry"
 	verbose_name_plural="Rolodex"
-    class Admin:
-        search_fields = ['first_name','last_name']
-	fields = (
-	    (None, {
-		'fields': (('first_name', 'middle_initial', 'last_name'), ('name_suffix', 'modified_by'))
-	    }),
-	    ('Obsolete Info', {
-		'classes': 'collapse',
-		'fields': ('record_type', 'created_by', 'address_type')
-	    }))
-        pass
 
 # could use a mapping for user_level
 class IESGLogin(models.Model):
@@ -286,14 +285,14 @@ class IESGLogin(models.Model):
 	(4, 'Comment Only(?)'),
     )
     id = models.AutoField(primary_key=True)
-    login_name = models.CharField(blank=True, maxlength=255)
-    password = models.CharField(maxlength=25)
+    login_name = models.CharField(blank=True, max_length=255)
+    password = models.CharField(max_length=25)
     user_level = models.IntegerField(choices=USER_LEVEL_CHOICES)
-    first_name = models.CharField(blank=True, maxlength=25)
-    last_name = models.CharField(blank=True, maxlength=25)
-    person = models.ForeignKey(PersonOrOrgInfo, db_column='person_or_org_tag', raw_id_admin=True, unique=True)
-    pgp_id = models.CharField(blank=True, maxlength=20)
-    default_search = models.IntegerField(null=True)
+    first_name = models.CharField(blank=True, max_length=25)
+    last_name = models.CharField(blank=True, max_length=25)
+    person = models.ForeignKey(PersonOrOrgInfo, db_column='person_or_org_tag', unique=True)
+    pgp_id = models.CharField(blank=True, null=True, max_length=20)
+    default_search = models.NullBooleanField()
     def __str__(self):
         #return "%s, %s" % ( self.last_name, self.first_name)
         return "%s %s" % ( self.first_name, self.last_name)
@@ -304,14 +303,10 @@ class IESGLogin(models.Model):
     active_iesg = staticmethod(active_iesg)
     class Meta:
         db_table = 'iesg_login'
-    class Admin:
-	list_display = ('login_name', 'first_name', 'last_name', 'user_level')
-        ordering = ['user_level','last_name']
-	pass
 
 class AreaDirector(models.Model):
-    area = models.ForeignKey(Area, db_column='area_acronym_id', edit_inline=models.STACKED, num_in_admin=2, null=True)
-    person = models.ForeignKey(PersonOrOrgInfo, db_column='person_or_org_tag', raw_id_admin=True, core=True)
+    area = models.ForeignKey(Area, db_column='area_acronym_id', null=True)
+    person = models.ForeignKey(PersonOrOrgInfo, db_column='person_or_org_tag')
     def __str__(self):
         return "%s (%s)" % ( self.person, self.role() )
     def role(self):
@@ -321,8 +316,7 @@ class AreaDirector(models.Model):
 	    return "?%d? AD" % self.area_id
     class Meta:
         db_table = 'area_directors'
-    class Admin:
-	pass
+
 
 ###
 # RFC tables
@@ -330,40 +324,36 @@ class AreaDirector(models.Model):
 class RfcIntendedStatus(models.Model):
     NONE=5
     intended_status_id = models.AutoField(primary_key=True)
-    status = models.CharField(maxlength=25, db_column='status_value')
+    status = models.CharField(max_length=25, db_column='status_value')
     def __str__(self):
         return self.status
     class Meta:
         db_table = 'rfc_intend_status'
 	verbose_name = 'RFC Intended Status Field'
-    class Admin:
-	pass
 
 class RfcStatus(models.Model):
     status_id = models.AutoField(primary_key=True)
-    status = models.CharField(maxlength=25, db_column='status_value')
+    status = models.CharField(max_length=25, db_column='status_value')
     def __str__(self):
         return self.status
     class Meta:
         db_table = 'rfc_status'
 	verbose_name = 'RFC Status'
 	verbose_name_plural = 'RFC Statuses'
-    class Admin:
-	pass
 
 class Rfc(models.Model):
     ONLINE_CHOICES=(('YES', 'Yes'), ('NO', 'No'))
     rfc_number = models.IntegerField(primary_key=True)
-    title = models.CharField(maxlength=200, db_column='rfc_name')
-    rfc_name_key = models.CharField(maxlength=200, editable=False)
-    group_acronym = models.CharField(blank=True, maxlength=8)
-    area_acronym = models.CharField(blank=True, maxlength=8)
+    title = models.CharField(max_length=200, db_column='rfc_name')
+    rfc_name_key = models.CharField(max_length=200, editable=False)
+    group_acronym = models.CharField(blank=True, max_length=8)
+    area_acronym = models.CharField(blank=True, max_length=8)
     status = models.ForeignKey(RfcStatus, db_column="status_id")
     intended_status = models.ForeignKey(RfcIntendedStatus, db_column="intended_status_id", default=RfcIntendedStatus.NONE)
-    fyi_number = models.CharField(blank=True, maxlength=20)
-    std_number = models.CharField(blank=True, maxlength=20)
+    fyi_number = models.CharField(blank=True, max_length=20)
+    std_number = models.CharField(blank=True, max_length=20)
     txt_page_count = models.IntegerField(null=True, blank=True)
-    online_version = models.CharField(choices=ONLINE_CHOICES, maxlength=3, default='YES')
+    online_version = models.CharField(choices=ONLINE_CHOICES, max_length=3, default='YES')
     rfc_published_date = models.DateField(null=True, blank=True)
     proposed_date = models.DateField(null=True, blank=True)
     draft_date = models.DateField(null=True, blank=True)
@@ -389,14 +379,6 @@ class Rfc(models.Model):
 	return "RFC"
     def revision_display(self):
 	return "RFC"
-    def doclink(self):
-	return "http://" + settings.TOOLS_SERVER + "/html/%s" % ( self.displayname() )
-    def doctype(self):
-	return "RFC"
-    def filename_with_link(self):
-	return '<a href="%s">%s</a>' % ( self.doclink(), self.displayname() )
-    def displayname_with_link(self):
-        return self.filename_with_link()
     _idinternal_cache = None
     _idinternal_cached = False
     def idinternal(self):
@@ -408,33 +390,23 @@ class Rfc(models.Model):
 	    self._idinternal_cache = None
 	self._idinternal_cached = True
 	return self._idinternal_cache
+
+    # return set of RfcObsolete objects obsoleted or updated by this RFC
+    def obsoletes(self): 
+        return RfcObsolete.objects.filter(rfc=self.rfc_number)
+
+    # return set of RfcObsolete objects obsoleting or updating this RFC
+    def obsoleted_by(self): 
+        return RfcObsolete.objects.filter(rfc_acted_on=self.rfc_number)
+
     class Meta:
         db_table = 'rfcs'
 	verbose_name = 'RFC'
 	verbose_name_plural = 'RFCs'
-    class Admin:
-	search_fields = ['title']
-	list_display = ['rfc_number', 'title']
-	fields = (
-	    (None, {
-		'fields': ('rfc_number', 'title', 'group_acronym', 'area_acronym', 'status', 'comments', 'last_modified_date')
-	    }),
-	    ('Metadata', {
-		'classes': 'collapse',
-		'fields': (('online_version', 'txt_page_count'), ('fyi_number', 'std_number'))
-	    }),
-	    ('Standards Track Dates', {
-		'classes': 'collapse',
-		'fields': ('rfc_published_date', ('proposed_date', 'draft_date'), ('standard_date', 'historic_date'))
-	    }),
-	    ('Last Call / Ballot Info', {
-		'classes': 'collapse',
-		'fields': ('intended_status', ('lc_sent_date', 'lc_expiration_date'), ('b_sent_date', 'b_approve_date'))
-	    }))
 
 class RfcAuthor(models.Model):
-    rfc = models.ForeignKey(Rfc, unique=True, db_column='rfc_number', related_name='authors', edit_inline=models.TABULAR)
-    person = models.ForeignKey(PersonOrOrgInfo, db_column='person_or_org_tag', raw_id_admin=True, core=True)
+    rfc = models.ForeignKey(Rfc, db_column='rfc_number', related_name='authors')
+    person = models.ForeignKey(PersonOrOrgInfo, db_column='person_or_org_tag')
     def __str__(self):
         return "%s, %s" % ( self.person.last_name, self.person.first_name)
     class Meta:
@@ -442,17 +414,16 @@ class RfcAuthor(models.Model):
 	verbose_name = 'RFC Author'
 
 class RfcObsolete(models.Model):
-    rfc = models.ForeignKey(Rfc, db_column='rfc_number', raw_id_admin=True, related_name='updates_or_obsoletes')
-    action = models.CharField(maxlength=20, core=True)
-    rfc_acted_on = models.ForeignKey(Rfc, db_column='rfc_acted_on', raw_id_admin=True, related_name='updated_or_obsoleted_by')
+    ACTION_CHOICES=(('Obsoletes', 'Obsoletes'), ('Updates', 'Updates'))
+    rfc = models.ForeignKey(Rfc, db_column='rfc_number', related_name='updates_or_obsoletes')
+    action = models.CharField(max_length=20, choices=ACTION_CHOICES)
+    rfc_acted_on = models.ForeignKey(Rfc, db_column='rfc_acted_on', related_name='updated_or_obsoleted_by')
     def __str__(self):
         return "RFC%04d %s RFC%04d" % (self.rfc_id, self.action, self.rfc_acted_on_id)
     class Meta:
         db_table = 'rfcs_obsolete'
 	verbose_name = 'RFC updates or obsoletes'
 	verbose_name_plural = verbose_name
-    class Admin:
-	pass
 
 ## End RFC Tables
 
@@ -461,9 +432,9 @@ class BallotInfo(models.Model):   # Added by Michael Lee
     active = models.BooleanField()
     an_sent = models.BooleanField()
     an_sent_date = models.DateField(null=True, blank=True)
-    an_sent_by = models.ForeignKey(IESGLogin, db_column='an_sent_by', related_name='ansent') 
-    defer = models.BooleanField(null=True, blank=True)
-    defer_by = models.ForeignKey(IESGLogin, db_column='defer_by', related_name='deferred')
+    an_sent_by = models.ForeignKey(IESGLogin, db_column='an_sent_by', related_name='ansent', null=True) 
+    defer = models.BooleanField(blank=True)
+    defer_by = models.ForeignKey(IESGLogin, db_column='defer_by', related_name='deferred', null=True)
     defer_date = models.DateField(null=True, blank=True)
     approval_text = models.TextField(blank=True)
     last_call_text = models.TextField(blank=True)
@@ -488,10 +459,49 @@ class BallotInfo(models.Model):   # Added by Michael Lee
 	for ad in active_iesg:
 	    ret.append({'ad': ad, 'pos': positions.get(ad.id, None)})
 	return ret 
+    def needed(self, standardsTrack=True):
+	'''Returns text answering the question "what does this document
+	need to pass?".  The return value is only useful if the document
+	is currently in IESG evaluation.'''
+	active_iesg = IESGLogin.active_iesg()
+	ads = [ad.id for ad in active_iesg]
+	yes = 0
+	noobj = 0
+	discuss = 0
+	recuse = 0
+	for position in self.positions.filter(ad__in=ads):
+	    yes += 1 if position.yes > 0 else 0
+	    noobj += 1 if position.noobj > 0 else 0
+	    discuss += 1 if position.discuss > 0 else 0
+	    recuse += 1 if position.recuse > 0 else 0
+	answer = ''
+	if yes < 1:
+	    answer += "Needs a YES. "
+	if discuss > 0:
+	    if discuss == 1:
+		answer += "Has a DISCUSS. "
+	    else:
+		answer += "Has %d DISCUSSes. " % discuss
+	if standardsTrack:
+	    # For standards-track, need positions from 2/3 of the
+	    # non-recused current IESG.
+	    needed = ( active_iesg.count() - recuse ) * 2 / 3
+	else:
+	    # Info and experimental only need one position.
+	    needed = 1
+	have = yes + noobj + discuss
+	if have < needed:
+	    answer += "Needs %d more positions. " % (needed - have)
+	else:
+	    answer += "Has enough positions to pass"
+	    if discuss:
+		answer += " once DISCUSSes are resolved"
+	    answer += ". "
+
+	return answer.rstrip()
+
     class Meta:
         db_table = 'ballot_info'
-    class Admin:
-	pass
 
 class IDInternal(models.Model):
     """
@@ -510,20 +520,29 @@ class IDInternal(models.Model):
     you cannot use draft__ as that will cause an INNER JOIN
     which will limit the responses to I-Ds.
     """
+
+    ACTIVE=1
+    PUBLISHED=3
+    EXPIRED=2
+    WITHDRAWN_SUBMITTER=4
+    REPLACED=5
+    WITHDRAWN_IETF=6
+    INACTIVE_STATES=[99,32,42]
+
     draft = models.ForeignKey(InternetDraft, primary_key=True, unique=True, db_column='id_document_tag')
     rfc_flag = models.IntegerField(null=True)
     ballot = models.ForeignKey(BallotInfo, related_name='drafts', db_column="ballot_id")
     primary_flag = models.IntegerField(blank=True, null=True)
     group_flag = models.IntegerField(blank=True)
-    token_name = models.CharField(blank=True, maxlength=25)
-    token_email = models.CharField(blank=True, maxlength=255)
+    token_name = models.CharField(blank=True, max_length=25)
+    token_email = models.CharField(blank=True, max_length=255)
     note = models.TextField(blank=True)
-    status_date = models.DateField(null=True)
-    email_display = models.CharField(blank=True, maxlength=50)
+    status_date = models.DateField(blank=True,null=True)
+    email_display = models.CharField(blank=True, max_length=50)
     agenda = models.IntegerField(null=True, blank=True)
     cur_state = models.ForeignKey(IDState, db_column='cur_state', related_name='docs')
     prev_state = models.ForeignKey(IDState, db_column='prev_state', related_name='docs_prev')
-    assigned_to = models.CharField(blank=True, maxlength=25)
+    assigned_to = models.CharField(blank=True, max_length=25)
     mark_by = models.ForeignKey(IESGLogin, db_column='mark_by', related_name='marked')
     job_owner = models.ForeignKey(IESGLogin, db_column='job_owner', related_name='documents')
     event_date = models.DateField(null=True)
@@ -533,7 +552,7 @@ class IDInternal(models.Model):
     returning_item = models.IntegerField(null=True, blank=True)
     telechat_date = models.DateField(null=True, blank=True)
     via_rfc_editor = models.IntegerField(null=True, blank=True)
-    state_change_notice_to = models.CharField(blank=True, maxlength=255)
+    state_change_notice_to = models.CharField(blank=True, max_length=255)
     dnp = models.IntegerField(null=True, blank=True)
     dnp_date = models.DateField(null=True, blank=True)
     noproblem = models.IntegerField(null=True, blank=True)
@@ -546,9 +565,9 @@ class IDInternal(models.Model):
 	    return self.draft.filename
     def get_absolute_url(self):
 	if self.rfc_flag:
-	    return "/idtracker/rfc%d/" % ( self.draft_id )
+	    return "/doc/rfc%d/" % ( self.draft_id )
 	else:
-	    return "/idtracker/%s/" % ( self.draft.filename )
+	    return "/doc/%s/" % ( self.draft.filename )
     _cached_rfc = None
     def document(self):
 	if self.rfc_flag:
@@ -562,7 +581,12 @@ class IDInternal(models.Model):
     def comments(self):
 	# would filter by rfc_flag but the database is broken. (see
 	# trac ticket #96) so this risks collisions.
-	return self.documentcomment_set.all().order_by('-comment_date','-comment_time','-id')
+	# return self.documentcomment_set.all().order_by('-date','-time','-id')
+        #
+        # the obvious code above doesn't work with django.VERSION 1.0/1.1
+        # because "draft" isn't a true foreign key (when rfc_flag=1 the
+        # related InternetDraft object doesn't necessarily exist).
+        return DocumentComment.objects.filter(document=self.draft_id).order_by('-date','-time','-id')
     def ballot_set(self):
 	return IDInternal.objects.filter(ballot=self.ballot_id).order_by('-primary_flag')
     def ballot_primary(self):
@@ -577,8 +601,6 @@ class IDInternal(models.Model):
     class Meta:
         db_table = 'id_internal'
 	verbose_name = 'IDTracker Draft'
-    class Admin:
-	pass
 
 class DocumentComment(models.Model):
     BALLOT_CHOICES = (
@@ -586,12 +608,16 @@ class DocumentComment(models.Model):
 	(2, 'comment'),
     )
     document = models.ForeignKey(IDInternal)
+    # NOTE: This flag is often NULL, which complicates its correct use...
     rfc_flag = models.IntegerField(null=True, blank=True)
     public_flag = models.IntegerField()
     date = models.DateField(db_column='comment_date')
-    time = models.CharField(db_column='comment_time', maxlength=20)
-    version = models.CharField(blank=True, maxlength=3)
+    time = models.CharField(db_column='comment_time', max_length=20)
+    version = models.CharField(blank=True, max_length=3)
     comment_text = models.TextField(blank=True)
+    # NOTE: This is not a true foreign key -- it sometimes has values 
+    # (like 999) that do not exist in IESGLogin. So using select_related()
+    # will break!    
     created_by = models.ForeignKey(IESGLogin, db_column='created_by', null=True)
     result_state = models.ForeignKey(IDState, db_column='result_state', null=True, related_name="comments_leading_to_state")
     origin_state = models.ForeignKey(IDState, db_column='origin_state', null=True, related_name="comments_coming_from_state")
@@ -626,8 +652,8 @@ class DocumentComment(models.Model):
         db_table = 'document_comments'
 
 class Position(models.Model):
-    ballot = models.ForeignKey(BallotInfo, raw_id_admin=True, related_name='positions')
-    ad = models.ForeignKey(IESGLogin, raw_id_admin=True)
+    ballot = models.ForeignKey(BallotInfo, related_name='positions')
+    ad = models.ForeignKey(IESGLogin)
     yes = models.IntegerField(db_column='yes_col')
     noobj = models.IntegerField(db_column='no_col')
     abstain = models.IntegerField()
@@ -647,14 +673,12 @@ class Position(models.Model):
         db_table = 'ballots'
 	unique_together = (('ballot', 'ad'), )
 	verbose_name = "IESG Ballot Position"
-    class Admin:
-	pass
 
 class IESGComment(models.Model):
-    ballot = models.ForeignKey(BallotInfo, raw_id_admin=True, related_name="comments")
-    ad = models.ForeignKey(IESGLogin, raw_id_admin=True)
+    ballot = models.ForeignKey(BallotInfo, related_name="comments")
+    ad = models.ForeignKey(IESGLogin)
     date = models.DateField(db_column="comment_date")
-    revision = models.CharField(maxlength=2)
+    revision = models.CharField(max_length=2)
     active = models.IntegerField()
     text = models.TextField(blank=True, db_column="comment_text")
     def __str__(self):
@@ -666,14 +690,12 @@ class IESGComment(models.Model):
 	unique_together = (('ballot', 'ad'), )
 	verbose_name = 'IESG Comment Text'
 	verbose_name_plural = 'IESG Comments'
-    class Admin:
-	pass
 
 class IESGDiscuss(models.Model):
-    ballot = models.ForeignKey(BallotInfo, raw_id_admin=True, related_name="discusses")
-    ad = models.ForeignKey(IESGLogin, raw_id_admin=True)
+    ballot = models.ForeignKey(BallotInfo, related_name="discusses")
+    ad = models.ForeignKey(IESGLogin)
     date = models.DateField(db_column="discuss_date")
-    revision = models.CharField(maxlength=2)
+    revision = models.CharField(max_length=2)
     active = models.IntegerField()
     text = models.TextField(blank=True, db_column="discuss_text")
     def __str__(self):
@@ -685,20 +707,24 @@ class IESGDiscuss(models.Model):
 	unique_together = (('ballot', 'ad'), )
 	verbose_name = 'IESG Discuss Text'
 	verbose_name_plural = 'IESG Discusses'
-    class Admin:
-	pass
 
 class IDAuthor(models.Model):
-    document = models.ForeignKey(InternetDraft, db_column='id_document_tag', related_name='authors', edit_inline=models.TABULAR, raw_id_admin=True)
-    person = models.ForeignKey(PersonOrOrgInfo, db_column='person_or_org_tag', raw_id_admin=True, core=True)
+    document = models.ForeignKey(InternetDraft, db_column='id_document_tag', related_name='authors')
+    person = models.ForeignKey(PersonOrOrgInfo, db_column='person_or_org_tag')
     author_order = models.IntegerField()
     def __str__(self):
 	return "%s authors %s" % ( self.person, self.document.filename )
     def email(self):
-	try:
-	    return self.person.emailaddress_set.filter(type='I-D').get(priority=self.document_id).address
-	except EmailAddress.DoesNotExist:
-	    return None
+        addresses = self.person.emailaddress_set.filter(type='I-D',priority=self.document_id)
+        if len(addresses) == 0:
+            return None
+        else:
+            return addresses[0].address
+    def final_author_order(self):
+        # Unfortunately, multiple authors for the same draft can have
+        # the same value for author_order (although they should not).
+        # Sort by person_id in that case to get a deterministic ordering.
+        return "%08d%08d" % (self.author_order, self.person_id)
     class Meta:
         db_table = 'id_authors'
 	verbose_name = "I-D Author"
@@ -713,20 +739,20 @@ class IDAuthor(models.Model):
 #  to be fixed by moving admin to newforms.
 # must decide which field is/are core.
 class PostalAddress(models.Model):
-    address_type = models.CharField(maxlength=4)
+    address_type = models.CharField(max_length=4)
     address_priority = models.IntegerField(null=True)
-    person_or_org = models.ForeignKey(PersonOrOrgInfo, db_column='person_or_org_tag', edit_inline=models.STACKED, num_in_admin=1)
-    person_title = models.CharField(maxlength=50, blank=True)
-    affiliated_company = models.CharField(maxlength=70, blank=True)
-    aff_company_key = models.CharField(maxlength=70, blank=True, editable=False)
-    department = models.CharField(maxlength=100, blank=True)
-    staddr1 = models.CharField(maxlength=40, core=True)
-    staddr2 = models.CharField(maxlength=40, blank=True)
-    mail_stop = models.CharField(maxlength=20, blank=True)
-    city = models.CharField(maxlength=20, blank=True)
-    state_or_prov = models.CharField(maxlength=20, blank=True)
-    postal_code = models.CharField(maxlength=20, blank=True)
-    country = models.CharField(maxlength=20, blank=True)
+    person_or_org = models.ForeignKey(PersonOrOrgInfo, db_column='person_or_org_tag')
+    person_title = models.CharField(max_length=50, blank=True)
+    affiliated_company = models.CharField(max_length=70, blank=True)
+    aff_company_key = models.CharField(max_length=70, blank=True, editable=False)
+    department = models.CharField(max_length=100, blank=True)
+    staddr1 = models.CharField(max_length=40)
+    staddr2 = models.CharField(max_length=40, blank=True)
+    mail_stop = models.CharField(max_length=20, blank=True)
+    city = models.CharField(max_length=20, blank=True)
+    state_or_prov = models.CharField(max_length=20, blank=True)
+    postal_code = models.CharField(max_length=20, blank=True)
+    country = models.CharField(max_length=20, blank=True)
     def save(self):
 	self.aff_company_key = self.affiliated_company.upper()
 	super(PostalAddress, self).save()
@@ -736,11 +762,11 @@ class PostalAddress(models.Model):
 	verbose_name_plural = 'Postal Addresses'
 
 class EmailAddress(models.Model):
-    person_or_org = models.ForeignKey(PersonOrOrgInfo, db_column='person_or_org_tag', edit_inline=models.TABULAR, num_in_admin=1)
-    type = models.CharField(maxlength=4, db_column='email_type')
+    person_or_org = models.ForeignKey(PersonOrOrgInfo, db_column='person_or_org_tag')
+    type = models.CharField(max_length=4, db_column='email_type')
     priority = models.IntegerField(db_column='email_priority')
-    address = models.CharField(maxlength=255, core=True, db_column='email_address')
-    comment = models.CharField(blank=True, maxlength=255, db_column='email_comment')
+    address = models.CharField(max_length=255, db_column='email_address')
+    comment = models.CharField(blank=True, null=True, max_length=255, db_column='email_comment')
     def __str__(self):
 	return self.address
     class Meta:
@@ -750,11 +776,11 @@ class EmailAddress(models.Model):
 	verbose_name_plural = 'Email addresses'
 
 class PhoneNumber(models.Model):
-    person_or_org = models.ForeignKey(PersonOrOrgInfo, db_column='person_or_org_tag', edit_inline=models.TABULAR, num_in_admin=1)
-    phone_type = models.CharField(maxlength=3)
+    person_or_org = models.ForeignKey(PersonOrOrgInfo, db_column='person_or_org_tag')
+    phone_type = models.CharField(max_length=3)
     phone_priority = models.IntegerField()
-    phone_number = models.CharField(blank=True, maxlength=255, core=True)
-    phone_comment = models.CharField(blank=True, maxlength=255)
+    phone_number = models.CharField(blank=True, max_length=255)
+    phone_comment = models.CharField(blank=True, max_length=255)
     class Meta:
         db_table = 'phone_numbers'
 	#unique_together = (('phone_priority', 'person_or_org'), )
@@ -763,23 +789,22 @@ class PhoneNumber(models.Model):
 
 class WGType(models.Model):
     group_type_id = models.AutoField(primary_key=True)
-    type = models.CharField(maxlength=25, db_column='group_type')
+    type = models.CharField(max_length=25, db_column='group_type')
     def __str__(self):
 	return self.type
     class Meta:
+        verbose_name = "WG Type"
         db_table = 'g_type'
-    class Admin:
-	pass
 
 class WGStatus(models.Model):
     status_id = models.AutoField(primary_key=True)
-    status = models.CharField(maxlength=25, db_column='status_value')
+    status = models.CharField(max_length=25, db_column='status_value')
     def __str__(self):
 	return self.status
     class Meta:
+        verbose_name = "WG Status"
+        verbose_name_plural = "WG Statuses"
         db_table = 'g_status'
-    class Admin:
-	pass
 
 class IETFWG(models.Model):
     ACTIVE = 1
@@ -791,14 +816,14 @@ class IETFWG(models.Model):
     concluded_date = models.DateField(null=True, blank=True)
     status = models.ForeignKey(WGStatus)
     area_director = models.ForeignKey(AreaDirector, null=True)
-    meeting_scheduled = models.CharField(blank=True, maxlength=3)
-    email_address = models.CharField(blank=True, maxlength=60)
-    email_subscribe = models.CharField(blank=True, maxlength=120)
-    email_keyword = models.CharField(blank=True, maxlength=50)
-    email_archive = models.CharField(blank=True, maxlength=95)
+    meeting_scheduled = models.CharField(blank=True, max_length=3)
+    email_address = models.CharField(blank=True, max_length=60)
+    email_subscribe = models.CharField(blank=True, max_length=120)
+    email_keyword = models.CharField(blank=True, max_length=50)
+    email_archive = models.CharField(blank=True, max_length=95)
     comments = models.TextField(blank=True)
     last_modified_date = models.DateField()
-    meeting_scheduled_old = models.CharField(blank=True, maxlength=3)
+    meeting_scheduled_old = models.CharField(blank=True, max_length=3)
     area = FKAsOneToOne('areagroup', reverse=True)
     def __str__(self):
 	return self.group_acronym.acronym
@@ -808,23 +833,52 @@ class IETFWG(models.Model):
 	return [(wg.group_acronym_id, wg.group_acronym.acronym) for wg in IETFWG.objects.all().filter(group_type__type='WG').select_related().order_by('acronym.acronym')]
     choices = staticmethod(choices)
     def area_acronym(self):
-        return AreaGroup.objects.filter(group_acronym_id=self.group_acronym_id).area 
+        areas = AreaGroup.objects.filter(group__exact=self.group_acronym)
+        if areas:
+            return areas[areas.count()-1].area.area_acronym
+        else:
+            return None
+    def area_directors(self):
+        areas = AreaGroup.objects.filter(group__exact=self.group_acronym)
+        if areas:
+            return areas[areas.count()-1].area.areadirector_set.all()
+        else:
+            return None
+    def chairs(self): # return a set of WGChair objects for this work group
+        return WGChair.objects.filter(group_acronym__exact=self.group_acronym)
+    def secretaries(self): # return a set of WGSecretary objects for this group
+        return WGSecretary.objects.filter(group_acronym__exact=self.group_acronym)
+    def milestones(self): # return a set of GoalMilestone objects for this group
+        return GoalMilestone.objects.filter(group_acronym__exact=self.group_acronym)
+    def rfcs(self): # return a set of Rfc objects for this group
+        return Rfc.objects.filter(group_acronym__exact=self.group_acronym)
+    def drafts(self): # return a set of Rfc objects for this group
+        return InternetDraft.objects.filter(group__exact=self.group_acronym)
+    def charter_text(self): # return string containing WG description read from file
+        # get file path from settings. Syntesize file name from path, acronym, and suffix
+        try:
+            filename = os.path.join(settings.IETFWG_DESCRIPTIONS_PATH, self.group_acronym.acronym) + ".desc.txt"
+            desc_file = open(filename)
+            desc = desc_file.read()
+        except BaseException:    
+            desc =  'Error Loading Work Group Description'
+        return desc
+
+    def additional_urls(self):
+        return AreaWGURL.objects.filter(name=self.group_acronym.acronym)        
+    def clean_email_archive(self):
+        x = self.email_archive
+        # remove "current/" and "maillist.html"
+        x = re.sub("^(http://www\.ietf\.org/mail-archive/web/)([^/]+/)(current/)?([a-z]+\.html)?$", "\\1\\2", x)
+        return x
     class Meta:
         db_table = 'groups_ietf'
 	ordering = ['?']	# workaround django wanting to sort by acronym but not joining with it
 	verbose_name = 'IETF Working Group'
-    class Admin:
-	search_fields = ['group_acronym__acronym', 'group_acronym__name']
-	# Until the database is consistent, including area_director in
-	# this list means that we'll have FK failures, so skip it for now.
-	list_display = ('group_acronym', 'group_type', 'status')
-	list_filter = ['status', 'group_type']
-	#list_display = ('group_acronym', 'group_type', 'status', 'area_director')
-	#list_filter = ['status', 'group_type', 'area_director']
 
 class WGChair(models.Model):
-    person = models.ForeignKey(PersonOrOrgInfo, db_column='person_or_org_tag', raw_id_admin=True, unique=True, core=True)
-    group_acronym = models.ForeignKey(IETFWG, edit_inline=models.TABULAR)
+    person = models.ForeignKey(PersonOrOrgInfo, db_column='person_or_org_tag')
+    group_acronym = models.ForeignKey(IETFWG)
     def __str__(self):
 	return "%s (%s)" % ( self.person, self.role() )
     def role(self):
@@ -834,8 +888,8 @@ class WGChair(models.Model):
 	verbose_name = "WG Chair"
 
 class WGEditor(models.Model):
-    group_acronym = models.ForeignKey(IETFWG, edit_inline=models.TABULAR)
-    person = models.ForeignKey(PersonOrOrgInfo, db_column='person_or_org_tag', raw_id_admin=True, unique=True, core=True)
+    group_acronym = models.ForeignKey(IETFWG)
+    person = models.ForeignKey(PersonOrOrgInfo, db_column='person_or_org_tag', unique=True)
     class Meta:
         db_table = 'g_editors'
 	verbose_name = "WG Editor"
@@ -844,8 +898,8 @@ class WGEditor(models.Model):
 # This uses the 'g_secretaries' table but is called 'GSecretary' to
 # match the model naming scheme.
 class WGSecretary(models.Model):
-    group_acronym = models.ForeignKey(IETFWG, edit_inline=models.TABULAR)
-    person = models.ForeignKey(PersonOrOrgInfo, db_column='person_or_org_tag', raw_id_admin=True, unique=True, core=True)
+    group_acronym = models.ForeignKey(IETFWG)
+    person = models.ForeignKey(PersonOrOrgInfo, db_column='person_or_org_tag')
     def __str__(self):
 	return "%s (%s)" % ( self.person, self.role() )
     def role(self):
@@ -856,8 +910,8 @@ class WGSecretary(models.Model):
 	verbose_name_plural = "WG Secretaries"
 
 class WGTechAdvisor(models.Model):
-    group_acronym = models.ForeignKey(IETFWG, edit_inline=models.TABULAR)
-    person = models.ForeignKey(PersonOrOrgInfo, db_column='person_or_org_tag', raw_id_admin=True, core=True)
+    group_acronym = models.ForeignKey(IETFWG)
+    person = models.ForeignKey(PersonOrOrgInfo, db_column='person_or_org_tag')
     def __str__(self):
 	return "%s (%s)" % ( self.person, self.role() )
     def role(self):
@@ -867,8 +921,8 @@ class WGTechAdvisor(models.Model):
 	verbose_name = "WG Technical Advisor"
 
 class AreaGroup(models.Model):
-    area = models.ForeignKey(Area, db_column='area_acronym_id', related_name='areagroup', core=True)
-    group = models.ForeignKey(IETFWG, db_column='group_acronym_id', edit_inline=models.TABULAR, num_in_admin=1, max_num_in_admin=1, unique=True)
+    area = models.ForeignKey(Area, db_column='area_acronym_id', related_name='areagroup')
+    group = models.ForeignKey(IETFWG, db_column='group_acronym_id', unique=True)
     def __str__(self):
 	return "%s is in %s" % ( self.group, self.area )
     class Meta:
@@ -882,11 +936,11 @@ class GoalMilestone(models.Model):
         ('No', 'Not Done'),
     )
     gm_id = models.AutoField(primary_key=True)
-    group_acronym = models.ForeignKey(IETFWG, raw_id_admin=True)
+    group_acronym = models.ForeignKey(IETFWG)
     description = models.TextField()
     expected_due_date = models.DateField()
     done_date = models.DateField(null=True, blank=True)
-    done = models.CharField(blank=True, choices=DONE_CHOICES, maxlength=4)
+    done = models.CharField(blank=True, choices=DONE_CHOICES, max_length=4)
     last_modified_date = models.DateField()
     def __str__(self):
 	return self.description
@@ -895,24 +949,7 @@ class GoalMilestone(models.Model):
 	verbose_name = 'IETF WG Goal or Milestone'
 	verbose_name_plural = 'IETF WG Goals or Milestones'
 	ordering = ['expected_due_date']
-    class Admin:
-	list_display = ('group_acronym', 'description', 'expected_due_date', 'done')
-	date_hierarchy = 'expected_due_date'
-	list_filter = ['done']
-	pass
 
-class WGRoleTest(TestCase):
-    fixtures = ['wgtest']
-
-    def setUp(self):
-	self.xmas = IETFWG.objects.get(group_acronym__acronym='xmas')
-	self.snow = IETFWG.objects.get(group_acronym__acronym='snow')
-
-    def test_roles(self):
-    	self.assertEquals(self.xmas.wgchair_set.all()[0].role(), 'xmas WG Chair')
-	self.assertEquals(self.snow.wgchair_set.all()[0].role(), 'snow BOF Chair')
-	self.assertEquals(self.xmas.wgsecretary_set.all()[0].role(), 'xmas WG Secretary')
-	self.assertEquals(self.xmas.wgtechadvisor_set.all()[0].role(), 'xmas Technical Advisor')
 
 #### end wg stuff
 
@@ -922,8 +959,17 @@ class Role(models.Model):
     since expanded to store roles, such as "IAB Exec Dir" and "IAD",
     so the model is renamed.
     '''
-    person = models.ForeignKey(PersonOrOrgInfo, db_column='person_or_org_tag', raw_id_admin=True)
-    role_name = models.CharField(maxlength=25, db_column='chair_name')
+    person = models.ForeignKey(PersonOrOrgInfo, db_column='person_or_org_tag')
+    role_name = models.CharField(max_length=25, db_column='chair_name')
+    
+    # Role values
+    IETF_CHAIR            = 1
+    IAB_CHAIR             = 2
+    NOMCOM_CHAIR          = 3
+    IAB_EXCUTIVE_DIRECTOR = 4
+    IRTF_CHAIR            = 5
+    IAD_CHAIR             = 6
+
     # This __str__ makes it odd to use as a ForeignKey.
     def __str__(self):
 	return "%s (%s)" % (self.person, self.role())
@@ -934,42 +980,35 @@ class Role(models.Model):
 	    return self.role_name
     class Meta:
         db_table = 'chairs'
-    class Admin:
-	pass
 
 class ChairsHistory(models.Model):
     chair_type = models.ForeignKey(Role)
     present_chair = models.BooleanField()
-    person = models.ForeignKey(PersonOrOrgInfo, db_column='person_or_org_tag', raw_id_admin=True)
+    person = models.ForeignKey(PersonOrOrgInfo, db_column='person_or_org_tag')
     start_year = models.IntegerField()
     end_year = models.IntegerField(null=True, blank=True)
     def __str__(self):
 	return str(self.person)
     class Meta:
         db_table = 'chairs_history'
-    class Admin:
-	list_display = ('person', 'chair_type', 'start_year', 'end_year')
-	pass
 
 #
 # IRTF RG info
 class IRTF(models.Model):
     irtf_id = models.AutoField(primary_key=True)
-    acronym = models.CharField(blank=True, maxlength=25, db_column='irtf_acronym')
-    name = models.CharField(blank=True, maxlength=255, db_column='irtf_name')
-    charter_text = models.TextField(blank=True)
-    meeting_scheduled = models.BooleanField(null=True, blank=True)
+    acronym = models.CharField(blank=True, max_length=25, db_column='irtf_acronym')
+    name = models.CharField(blank=True, max_length=255, db_column='irtf_name')
+    charter_text = models.TextField(blank=True,null=True)
+    meeting_scheduled = models.BooleanField(blank=True)
     def __str__(self):
 	return self.acronym
     class Meta:
         db_table = 'irtf'
         verbose_name="IRTF Research Group"
-    class Admin:
-	pass
 
 class IRTFChair(models.Model):
-    irtf = models.ForeignKey(IRTF, edit_inline=models.STACKED, num_in_admin=2, core=True)
-    person = models.ForeignKey(PersonOrOrgInfo, db_column='person_or_org_tag', raw_id_admin=True)
+    irtf = models.ForeignKey(IRTF)
+    person = models.ForeignKey(PersonOrOrgInfo, db_column='person_or_org_tag')
     def __str__(self):
         return "%s is chair of %s" % (self.person, self.irtf)
     class Meta:
@@ -992,3 +1031,10 @@ class DocumentWrapper(object):
     def __init__(self, document):
 	self.document = document
 
+
+# changes done by convert-096.py:changed maxlength to max_length
+# removed core
+# removed edit_inline
+# removed max_num_in_admin
+# removed num_in_admin
+# removed raw_id_admin
