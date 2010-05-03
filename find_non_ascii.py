@@ -30,35 +30,36 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-unless (-d 'images/yui' && -d 'js/yui' && -d 'css/yui') {
-    die "run this script under /static/\n";
-}
+from ietf import settings
+from django.core import management
+management.setup_environ(settings)
 
-# From: http://developer.yahoo.com/yui/articles/hosting/?button&connection&container&cookie&event&fonts&menu&tabview&yahoo&MIN&norollup
+from django.db.models.fields import CharField, TextField
+from django import db
+from django.db import models
 
-$css_url = 'http://yui.yahooapis.com/combo?2.8.0r4/build/fonts/fonts-min.css&2.8.0r4/build/container/assets/skins/sam/container.css&2.8.0r4/build/menu/assets/skins/sam/menu.css&2.8.0r4/build/button/assets/skins/sam/button.css&2.8.0r4/build/tabview/assets/skins/sam/tabview.css';
-$js_url = 'http://yui.yahooapis.com/combo?2.8.0r4/build/yahoo/yahoo-min.js&2.8.0r4/build/event/event-min.js&2.8.0r4/build/connection/connection-min.js&2.8.0r4/build/dom/dom-min.js&2.8.0r4/build/container/container-min.js&2.8.0r4/build/menu/menu-min.js&2.8.0r4/build/element/element-min.js&2.8.0r4/build/button/button-min.js&2.8.0r4/build/cookie/cookie-min.js&2.8.0r4/build/tabview/tabview-min.js';
+cursor = db.connection.cursor()
 
-$cmd = "wget '$css_url' -O css/yui/yui-original.css";
-print $cmd; system $cmd;
-$cmd = "wget '$js_url' -O js/yui/yui.js";
-print $cmd; system $cmd;
+def check_non_ascii(model, field):
+    #print "    Checking", field.column
+    sql = "SELECT src.%s,src.%s FROM %s AS src WHERE src.%s RLIKE '[^\\t-~]+'" % (model._meta.pk.column, field.column, model._meta.db_table, field.column)
+    #print sql
+    cursor.execute(sql)
+    rows = cursor.fetchall()
+    if len(rows) > 0:
+        print "    NON-ASCII: %s.%s (%d rows)" % (model._meta.db_table,field.column, len(rows))
+        #for row in rows[0:20]:
+        #    print "   ", row
+        #print "    Use the following SQL to debug:"
+        #print sql
 
-open(I, "css/yui/yui-original.css") || die "yui-original.css: $!\n";
-open(O, ">css/yui/yui.css") || die "yui.css: $!\n";
-$/ = '(';
-%done = ();
-while ($_ = <I>) {
-    if (m!(http://[^/]+)(/.*?/)([^)./]+)(.png)!) {
-	if (!exists $done{"$3$4"}) {
-	    $cmd = "wget -nd $1$2$3$4 -O images/yui/$3$4\n";
-	    print $cmd; system $cmd;
-	    $done{"$3$4"} = 1;
-	}
-	s!(http://[^/]+)(/.*?/)([^)./]+)(.png)!/images/yui/$3$4!;
-    }
-    print O ;
-}
-close I;
-close O;
-unlink "css/yui/yui-original.css";
+APPS = ['announcements', 'idrfc','idtracker','iesg','ietfauth','ipr','liaisons','proceedings','redirects']
+all_models = []
+for app_label in APPS:
+    all_models.extend(models.get_models(models.get_app(app_label)))
+
+for model in all_models:
+    print "\nChecking %s (table %s)" % (model._meta.object_name, model._meta.db_table)
+    for f in model._meta.fields:
+        if isinstance(f, CharField) or isinstance(f, TextField):
+            check_non_ascii(model,f)
