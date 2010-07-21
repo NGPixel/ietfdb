@@ -204,12 +204,12 @@ class AdminSite(object):
             url(r'^logout/$',
                 wrap(self.logout),
                 name='logout'),
-            url(r'^password_change/$',
-                wrap(self.password_change, cacheable=True),
-                name='password_change'),
-            url(r'^password_change/done/$',
-                wrap(self.password_change_done, cacheable=True),
-                name='password_change_done'),
+            #url(r'^password_change/$',
+            #    wrap(self.password_change, cacheable=True),
+            #    name='password_change'),
+            #url(r'^password_change/done/$',
+            #    wrap(self.password_change_done, cacheable=True),
+            #    name='password_change_done'),
             url(r'^jsi18n/$',
                 wrap(self.i18n_javascript, cacheable=True),
                 name='jsi18n'),
@@ -277,6 +277,9 @@ class AdminSite(object):
         """
         Displays the login form for the given HttpRequest.
         """
+        url = "/accounts/login/?next="+request.get_full_path()
+        return http.HttpResponseRedirect(url)
+
         from django.contrib.auth.models import User
 
         # If this isn't already the login page, display it.
@@ -305,13 +308,13 @@ class AdminSite(object):
                 try:
                     user = User.objects.get(email=username)
                 except (User.DoesNotExist, User.MultipleObjectsReturned):
-                    message = _("Usernames cannot contain the '@' character.")
+                    pass
                 else:
                     if user.check_password(password):
                         message = _("Your e-mail address is not your username."
                                     " Try '%s' instead.") % user.username
                     else:
-                        message = _("Usernames cannot contain the '@' character.")
+                        pass
             return self.display_login_form(request, message)
 
         # The user data is correct; log in the user in and continue.
