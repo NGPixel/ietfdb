@@ -3,11 +3,14 @@
 # Create your views here.
 #import models
 from django.shortcuts import render_to_response as render, get_object_or_404
-from ietf.proceedings.models import Meeting, MeetingTime, WgMeetingSession, NonSession, MeetingVenue, IESGHistory, Proceeding, Switches
+from ietf.proceedings.models import Meeting, MeetingTime, WgMeetingSession, MeetingVenue, IESGHistory, Proceeding, Switches
 from django.views.generic.list_detail import object_list
-from django.http import HttpResponseRedirect, HttpResponsePermanentRedirect, Http404
+from django.http import HttpResponseRedirect, HttpResponse, Http404
 from django.core.urlresolvers import reverse
-from  django.db.models import Q
+from django.db.models import Q
+from django.template import RequestContext
+from django.template.loader import render_to_string
+from django.conf import settings
 import datetime
 
 def show_html_materials(request, meeting_num=None):
@@ -16,7 +19,9 @@ def show_html_materials(request, meeting_num=None):
     cut_off_date = proceeding.sub_cut_off_date
     cor_cut_off_date = proceeding.c_sub_cut_off_date
     now = datetime.date.today()
-    if now > cor_cut_off_date:
+    if settings.SERVER_MODE != 'production' and '_testoverride' in request.REQUEST:
+        pass
+    elif now > cor_cut_off_date:
         return render("meeting/list_closed.html",{'meeting_num':meeting_num,'begin_date':begin_date, 'cut_off_date':cut_off_date, 'cor_cut_off_date':cor_cut_off_date})
     sub_began = 0
     if now > begin_date:
@@ -39,45 +44,69 @@ def current_materials(request):
     meeting = Meeting.objects.order_by('-meeting_num')[0]
     return HttpResponseRedirect( reverse(show_html_materials, args=[meeting.meeting_num]) )
 
-def show_html_agenda(request, meeting_num=None, html_or_txt=None):
-    queryset_list=MeetingTime.objects.filter(meeting=meeting_num,day_id__gt='0').order_by("day_id","time_desc")
-    queryset_list_pre_session=MeetingTime.objects.filter(meeting=meeting_num,day_id__lte='0').order_by("day_id","time_desc")
-    meeting_info=get_object_or_404(Meeting, meeting_num=meeting_num)
-    nonsession_info=NonSession.objects.filter(meeting=meeting_num,day_id__gte='0').order_by("day_id")
-    meetingvenue_info=get_object_or_404(MeetingVenue, meeting_num=meeting_num)
-    last_update_info=get_object_or_404(Switches,id=1)
+def get_plenary_agenda(meeting_num, id):
     try:
-        plenaryt_agenda_file = "/a/www/ietf/proceedings/%s" % WgMeetingSession.objects.get(meeting=meeting_num,group_acronym_id=-2).agenda_file()
+        plenary_agenda_file = settings.AGENDA_PATH + WgMeetingSession.objects.get(meeting=meeting_num,group_acronym_id=id).agenda_file()
         try:
-            f = open(plenaryt_agenda_file)
-            plenaryt_agenda = f.read()
+            f = open(plenary_agenda_file)
+            plenary_agenda = f.read()
             f.close()
+            return plenary_agenda
         except IOError:
-             plenaryt_agenda = "THE AGENDA HAS NOT BEEN UPLOADED YET"
+             return "THE AGENDA HAS NOT BEEN UPLOADED YET"
     except WgMeetingSession.DoesNotExist:
-        plenaryt_agenda = "The Technical Plenary has not been scheduled"
-    if html_or_txt == "html":
-        template_file="meeting/agenda.html"
-    elif html_or_txt == "txt":
-        template_file="meeting/agenda.txt"
-    else:
-        raise Http404
-    try:
-        plenaryw_agenda_file = "/a/www/ietf/proceedings/%s" % WgMeetingSession.objects.get(meeting=meeting_num,group_acronym_id=-1).agenda_file()
-        try:
-            f = open(plenaryw_agenda_file)
-            plenaryw_agenda = f.read()
-            f.close()
-        except IOError:
-            plenaryw_agenda = "THE AGENDA HAS NOT BEEN UPLOADED YET"
-    except WgMeetingSession.DoesNotExist:
-        plenaryw_agenda = "THE IETF Operations and Administration Plenary has not been secheduled"
-    # Due to a bug in Django@0.96 we can't use foreign key lookup in
-    # order_by(), see http://code.djangoproject.com/ticket/2076.  Changeset
-    # [133] is broken because it requires a patched Django to run.  Work
-    # around this instead.  Later: FIXME (revert to the straightforward code
-    # when this bug has been fixed in the Django release we're running.)
-    queryset_list_ads = list(IESGHistory.objects.filter(meeting=meeting_num))
-    queryset_list_ads.sort(key=(lambda item: item.area.area_acronym.acronym))
-    return object_list(request,queryset=queryset_list, template_name=template_file,allow_empty=True, extra_context={'queryset_list_pre_session':queryset_list_pre_session, 'meeting_info':meeting_info, 'meeting_num':meeting_num, 'nonsession_info':nonsession_info, 'meetingvenue_info':meetingvenue_info, 'plenaryw_agenda':plenaryw_agenda, 'plenaryt_agenda':plenaryt_agenda, 'qs_ads':queryset_list_ads,'last_update_info':last_update_info})
+        return "The Plenary has not been scheduled"
 
+def agenda_info(num=None):
+    if num:
+        meetings = [ num ]
+    else:
+        meetings =list(Meeting.objects.all())
+        meetings.reverse()
+        meetings = [ meeting.meeting_num for meeting in meetings ]
+    for n in meetings:
+        try:
+            timeslots = MeetingTime.objects.select_related().filter(meeting=n).order_by("day_id", "time_desc")
+            update = Switches.objects.get(id=1)
+            meeting= Meeting.objects.get(meeting_num=n)
+            venue  = MeetingVenue.objects.get(meeting_num=n)
+            break
+        except (MeetingTime.DoesNotExist, Switches.DoesNotExist, Meeting.DoesNotExist, MeetingVenue.DoesNotExist):
+            continue
+    else:
+        raise Http404("No meeting information for meeting %s available" % num)
+    ads = list(IESGHistory.objects.select_related().filter(meeting=n))
+    if not ads:
+        ads = list(IESGHistory.objects.select_related().filter(meeting=str(int(n)-1)))
+    ads.sort(key=(lambda item: item.area.area_acronym.acronym))
+    plenaryw_agenda = get_plenary_agenda(n, -1)
+    plenaryt_agenda = get_plenary_agenda(n, -2)
+    return timeslots, update, meeting, venue, ads, plenaryw_agenda, plenaryt_agenda
+    
+def html_agenda(request, num=None):
+    timeslots, update, meeting, venue, ads, plenaryw_agenda, plenaryt_agenda = agenda_info(num)
+    if  settings.SERVER_MODE != 'production' and '_testiphone' in request.REQUEST:
+        user_agent = "iPhone"
+    elif 'HTTP_USER_AGENT' in request.META:
+        user_agent = request.META["HTTP_USER_AGENT"]
+    else:
+        user_agent = ""
+    #print user_agent
+    if "iPhone" in user_agent:
+        template = "meeting/m_agenda.html"
+    else:
+        template = "meeting/agenda.html"
+    return render(template,
+            {"timeslots":timeslots, "update":update, "meeting":meeting, "venue":venue, "ads":ads,
+                "plenaryw_agenda":plenaryw_agenda, "plenaryt_agenda":plenaryt_agenda, },
+            RequestContext(request))
+
+def text_agenda(request, num=None):
+    timeslots, update, meeting, venue, ads, plenaryw_agenda, plenaryt_agenda = agenda_info(num)
+    plenaryw_agenda = "   "+plenaryw_agenda.strip().replace("\n", "\n   ")
+    plenaryt_agenda = "   "+plenaryt_agenda.strip().replace("\n", "\n   ")
+    return HttpResponse(render_to_string("meeting/agenda.txt",
+        {"timeslots":timeslots, "update":update, "meeting":meeting, "venue":venue, "ads":ads,
+            "plenaryw_agenda":plenaryw_agenda, "plenaryt_agenda":plenaryt_agenda, },
+        RequestContext(request)), mimetype="text/plain")
+    

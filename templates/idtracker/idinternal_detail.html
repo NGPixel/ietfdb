@@ -25,7 +25,7 @@
       </th>
 
       <td>
-	  {{ object.document.displayname_with_link }}
+	  {{ object.document.displayname_with_link|safe }}
 	  {% ifequal object.document.doctype "Draft" %}
 	    {% ifnotequal object.document.status.status "Active" %}
 	      ({{ object.document.status.status }})
@@ -45,7 +45,7 @@
 	    {% if object.document.replaced_by.idinternal %}
 	      <a href="{{ object.document.replaced_by.idinternal.get_absolute_url }}">
 	    {% endif %}
-	    {{ object.document.replaced_by.displayname_with_link }}
+	    {{ object.document.replaced_by.displayname_with_link|safe }}
 	    {% if object.document.replaced_by.idinternal %}
 	      </a>
 	    {% endif %}
@@ -56,7 +56,7 @@
 	      {% if replaces.idinternal %}
 		<a href="{{ replaces.idinternal.get_absolute_url }}">
 	      {% endif %}
-	      {{ replaces.displayname_with_link }}{% if replaces.idinternal %}</a>{% endif %}{% if not forloop.last %},{% endif %}
+	      {{ replaces.displayname_with_link|safe }}{% if replaces.idinternal %}</a>{% endif %}{% if not forloop.last %},{% endif %}
 	    {% endfor %}
 	  {% endif %}
       </td>
@@ -160,7 +160,7 @@
 
       <td>
 	  {# |unformat_textarea #}
-	  {% firstof object.note &nbsp; %}
+	  {% firstof object.note "&nbsp;" %}
       </td>
     </tr>
 
@@ -203,7 +203,7 @@
 		<span class="{{ comment.get_ballot_display }}">[IESG Evaluation {{ comment.get_ballot_display|upper }}] </span>
 	{% endif %}
 
-	{{ comment.comment_text|removetags:"b br"|truncatewords_html:"20" }}
+	{{ comment.comment_text|removetags:"b br"|truncatewords_html:"20"|safe }}
 	[<a href="{{ comment.get_absolute_url }}">more</a>]
 	</td>
 
