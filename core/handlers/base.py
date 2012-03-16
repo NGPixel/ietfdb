@@ -154,13 +154,18 @@ class BaseHandler(object):
             return debug.technical_500_response(request, *exc_info)
 
         # When DEBUG is False, send an error message to the admins.
+        from django.views.debug import ExceptionReporter
+        reporter = ExceptionReporter(request, *exc_info)
+        html = reporter.get_traceback_html()
+
         subject = 'Error (%s IP): %s' % ((request.META.get('REMOTE_ADDR') in settings.INTERNAL_IPS and 'internal' or 'EXTERNAL'), request.path)
         try:
             request_repr = repr(request)
         except:
             request_repr = "Request repr() unavailable"
         message = "%s\n\n%s" % (self._get_traceback(exc_info), request_repr)
-        mail_admins(subject, message, fail_silently=True)
+        extra_emails = self._get_extra_emails(exc_info)
+        mail_admins(subject, message, fail_silently=True, html_message=html, extra_emails=extra_emails)
         # Return an HttpResponse that displays a friendly error message.
         callback, param_dict = resolver.resolve500()
         return callback(request, **param_dict)
@@ -169,6 +174,17 @@ class BaseHandler(object):
         "Helper function to return the traceback as a string"
         import traceback
         return '\n'.join(traceback.format_exception(*(exc_info or sys.exc_info())))
+
+    def _get_extra_emails(self, exc_info=None):
+        "Helper function to retrieve app-specific admin email lists."
+        etype, value, tb = exc_info or sys.exc_info()
+        admins = []
+        while tb is not None:
+            f = tb.tb_frame
+            if "DEBUG_EMAILS" in f.f_globals:
+                admins += f.f_globals["DEBUG_EMAILS"]
+            tb = tb.tb_next
+        return admins
 
     def apply_response_fixes(self, request, response):
         """
