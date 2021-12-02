@@ -8,11 +8,11 @@
 - [Creating a Fork](#creating-a-fork)
 - [Cloning a Fork](#cloning-a-fork)
   - [Using Git Command Line](#using-git-command-line)
-  - [Using GitHub Desktop / GitKraken](#using-github-desktop-gitkraken)
+  - [Using GitHub Desktop / GitKraken](#using-github-desktop--gitkraken)
   - [Using GitHub CLI](#using-github-cli)
 - [Create a Local Branch](#create-a-local-branch)
 - [Creating a Commit](#creating-a-commit)
-  - [From your editor / GUI tool](#from-your-editor-gui-tool)
+  - [From your editor / GUI tool](#from-your-editor-gui--tool)
   - [From the command line](#from-the-command-line)
 - [Push Commits](#push-commits)
 - [Create a Pull Request](#create-a-pull-request)
@@ -32,15 +32,15 @@ It consists of two primary branches:
 
 **Develop** - The develop branch contains the latest development changes for the next release. This is where new commits are merged.
 
-A typical development workflow consists of:
+A typical development workflow:
 
-1. The developer first [create a fork](#creating-a-fork) of the repository and then [clone the fork](#cloning-a-fork) to their local machine.
-2. The developer [create a new branch](#create-a-local-branch), based on the develop branch, for the feature / fix they are to work on.
-3. The developer [adds one or more commits](#creating-a-commit) to this feature/fix branch.
-4. The developer [pushes the commits](#push-commits) to the remote fork.
-5. The developer [creates a pull request (PR)](#create-a-pull-request) to request his feature branch from his fork to be merged to the source repository `develop` branch.
+1. First, [create a fork](#creating-a-fork) of the repository and then [clone the fork](#cloning-a-fork) to your local machine.
+2. [Create a new branch](#create-a-local-branch), based on the develop branch, for the feature / fix you are to work on.
+3. [Add one or more commits](#creating-a-commit) to this feature/fix branch.
+4. [Push the commits](#push-commits) to the remote fork.
+5. [Create a pull request (PR)](#create-a-pull-request) to request your feature branch from your fork to be merged to the source repository `develop` branch.
 6. The PR is reviewed by the lead developer / other developers, automated tests / checks are run to catch any errors and if accepted, the PR is merged with the `develop` branch.
-7. The developer [fast-forwards (sync)](#sync-your-fork) his forked develop branch to include the latest changes made by all developers.
+7. [Fast-forward (sync)](#sync-your-fork) your forked develop branch to include the latest changes made by all developers.
 8. Repeat this workflow from step 2.
 
 ![](media/docs/workflow-diagram.jpg)
