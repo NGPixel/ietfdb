@@ -226,4 +226,25 @@ git merge --ff-only origin/develop
 
 ### Python
 
-*TODO*
+#### Python Coding Style
+
+* Follow the coding style in the piece of code you are working on. Don't re-format code you're not working on to fit your preferred style. As a whole, the piece of code you're working on will be more readable if the style is consistent, even if it's not your style.
+
+* For Python code, PEP 8 is the style guide. Please adhere to it, except when in conflict with the bullet above.
+
+* Don't change whitespace in files you are working on, (except for in the code you're actually adding/changing, of course); and don't let your editor do end-of-line space stripping on saving. Gratuitous whitespace changes may give commit logs and diffs an appearance of there being a lot of changes, and your actual code change can be buried in all the whitespace-change noise.
+
+* Now and then, code clean-up projects are run. During those, it can be the right thing to do whitespace clean-up, coding style alignment, moving code around in order to have it live in a more appropriate place, etc. The point in *those* cases is that when you do that kind of work, it is labelled as such, and actual code changes are not to be inserted in style and whitespace-change commits. If you are not in a clean-up project, don't move code around if you're not actually doing work on it.
+
+* If you are modifying existing code, consider whether you're bending it out of shape in order to support your needs. If you're bending it too much out of shape, consider refactoring. Always try to leave code you change in a better shape than you found it.
+
+#### Python Tests
+
+* Reasonably comprehensive test suites should be written and committed to the project repository.
+* Projects written for Django should use Django's test facility, in files tests.py in each application directory.
+* Other projects, written in Python, should use Python's doctests or unittest framework.
+* Other projects should use the best practice for the respective code environment for testing.
+* As of release 5.12.0, the Django test suite for the datatracker includes tests which measure the test suite's code, template, and URL coverage and fails if it drops below that of the latest release. When merged in, your code should not make the test coverage drop below the latest release. Please run the full test suite regularly, to keep an eye on your coverage numbers.
+* Please shoot for a test suite with at least 80% code coverage for new code, as measured by the built-in coverage tests for the datatracker or standalone use of ​coverage.py for other Python projects. For non-Python projects, use the most appropriate test coverage measurement tool.
+* For the datatracker, aim for 100% test suite template coverage for new templates.
+* When a reported functional bug is being addressed, a test must be written or updated to fail while the bug is present and succeed when it has been fixed, and made part of the bugfix. This is not applicable for minor functional bugs, typos or template changes.
