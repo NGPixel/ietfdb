@@ -71,7 +71,7 @@ Above the list of files, click the **Code** button. A clone dialog will appear.
 
 There are several ways to clone a repository, depending on your personal preferences. Let's go through them...
 
-> :warning: In all cases, you must have **git** already installed on your system.
+> :triangular_flag_on_post:	 In all cases, you must have **git** already installed on your system.
 
 - [Using Git Command Line](#using-git-command-line)
 - [Using GitHub Desktop / GitKraken](#using-github-desktop-gitkraken)
@@ -262,7 +262,7 @@ These rules apply whether the code is inside a `.js` file or as part of a `.vue`
 
 Refer to the [rules](https://standardjs.com/rules.html) for a complete list with examples. However, here are some of the major ones:
 
-* No semi-colons!
+* No semi-colons! :no_entry_sign:
 * Use 2 spaces for indentation
 * Use single quotes for strings (except to avoid escaping)
 * Use camelCase when naming variables and functions
