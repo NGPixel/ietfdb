@@ -74,7 +74,7 @@ There are several ways to clone a repository, depending on your personal prefere
 > :triangular_flag_on_post:	 In all cases, you must have **git** already installed on your system.
 
 - [Using Git Command Line](#using-git-command-line)
-- [Using GitHub Desktop / GitKraken](#using-github-desktop-gitkraken)
+- [Using GitHub Desktop / GitKraken](#using-github-desktop--gitkraken)
 - [Using GitHub CLI](#using-github-cli)
 
 ### Using Git Command Line
