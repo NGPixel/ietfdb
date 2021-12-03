@@ -17,6 +17,7 @@
 - [Push Commits](#push-commits)
 - [Create a Pull Request](#create-a-pull-request)
 - [Sync your Fork](#sync-your-fork)
+  - [Syncing with uncommitted changes](#syncing-with-uncommitted-changes)
 - [Styleguides](#styleguides)
   - [Git Commit Messages](#git-commit-messages)
   - [Javascript](#javascript)
@@ -199,7 +200,34 @@ git checkout develop
 git merge --ff-only origin/develop
 ```
 
-> You can read more about the different ways of pulling the latest changes via [git merge](https://git-scm.com/docs/git-merge), [git pull](https://git-scm.com/docs/git-pull) and [git rebase](https://git-scm.com/docs/git-rebase).
+> While you could use the `git pull` command to achieve the same thing, this ensures that only a fast-forward operation will be executed and not a merge (which is most likely not what you want). You can read more about the different ways of pulling the latest changes via [git merge](https://git-scm.com/docs/git-merge), [git pull](https://git-scm.com/docs/git-pull) and [git rebase](https://git-scm.com/docs/git-rebase).
+
+### Syncing with uncommitted changes
+
+In some cases, you may need to get the latest changes while you're still working on your local branch.
+
+Some tools like GitKraken automates this process and will even handle the stashing process if necessary.
+
+If you prefer to use the command line:
+
+1. You must first [git stash](https://git-scm.com/docs/git-stash) any uncommitted changes:
+    ```sh
+    git stash
+    ```
+    This will save the current state of your branch so that it can be re-applied later.
+
+2. Run the [git rebase](https://git-scm.com/docs/git-rebase) command to fast-forward your branch to the latest commit from `develop` and then apply all your new commits on top of it:
+    ```sh
+    git rebase develop
+    ```
+    You can add the `-i` flag to the above command to trigger an interactive rebase session. Instead of blindly moving all of the commits to the new base, interactive rebasing gives you the opportunity to alter individual commits in the process.
+
+3. Use the [git stash pop](https://git-scm.com/docs/git-stash) :musical_note: command to restore any changes you previously stashed:
+    ```sh
+    git stash pop
+    ```
+
+> Note that you should **never** rebase once you've pushed commits to the source repository. After a PR, **always** fast-forward your forked develop branch to match the source one and create a new feature branch from it. Continuing directly from a previously merged branch will result in duplicated commits when you try to push or create a PR.
 
 ## Styleguides
 
