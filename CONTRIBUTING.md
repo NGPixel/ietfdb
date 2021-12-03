@@ -71,7 +71,7 @@ Above the list of files, click the **Code** button. A clone dialog will appear.
 
 There are several ways to clone a repository, depending on your personal preferences. Let's go through them...
 
-> In all cases, you must have **git** installed on your system.
+> :warning: In all cases, you must have **git** already installed on your system.
 
 - [Using Git Command Line](#using-git-command-line)
 - [Using GitHub Desktop / GitKraken](#using-github-desktop-gitkraken)
@@ -154,7 +154,7 @@ git commit
 ```
 This will launch a text editor prompting you for a commit message. Enter a meaningful short description of the change (see [Git Commit Messages](#git-commit-messages) section) and save.
 
-> There are several command parameters you can use to quickly add all modifications or execute several actions at once. Refer to the documentation for each command above.
+> :information_source: There are several command parameters you can use to quickly add all modifications or execute several actions at once. Refer to the documentation for each command above.
 
 ## Push Commits
 
@@ -167,7 +167,7 @@ If you prefer to use the command line, you would use the [git push](https://git-
 git push origin feature-1
 ```
 
-> If the feature branch doesn't exist on the remote fork, it will automatically be created.
+> :information_source: If the feature branch doesn't exist on the remote fork, it will automatically be created.
 
 ## Create a Pull Request
 
@@ -200,7 +200,7 @@ git checkout develop
 git merge --ff-only origin/develop
 ```
 
-> While you could use the `git pull` command to achieve the same thing, this ensures that only a fast-forward operation will be executed and not a merge (which is most likely not what you want). You can read more about the different ways of pulling the latest changes via [git merge](https://git-scm.com/docs/git-merge), [git pull](https://git-scm.com/docs/git-pull) and [git rebase](https://git-scm.com/docs/git-rebase).
+> :information_source: While you could use the `git pull` command to achieve the same thing, this ensures that only a fast-forward operation will be executed and not a merge (which is most likely not what you want). You can read more about the different ways of pulling the latest changes via [git merge](https://git-scm.com/docs/git-merge), [git pull](https://git-scm.com/docs/git-pull) and [git rebase](https://git-scm.com/docs/git-rebase).
 
 ### Syncing with uncommitted changes
 
@@ -227,7 +227,7 @@ If you prefer to use the command line:
     git stash pop
     ```
 
-> Note that you should **never** rebase once you've pushed commits to the source repository. After a PR, **always** fast-forward your forked develop branch to match the source one and create a new feature branch from it. Continuing directly from a previously merged branch will result in duplicated commits when you try to push or create a PR.
+> :warning: Note that you should **never** rebase once you've pushed commits to the source repository. After a PR, **always** fast-forward your forked develop branch to match the source one and create a new feature branch from it. Continuing directly from a previously merged branch will result in duplicated commits when you try to push or create a PR.
 
 ## Styleguides
 
