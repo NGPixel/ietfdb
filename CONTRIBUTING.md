@@ -270,7 +270,7 @@ Refer to the [rules](https://standardjs.com/rules.html) for a complete list with
 * No unused variables
 * Keep `else` statements on the same line as their curly braces
 * No trailing commas
-* Files must end with a newline
+* Files must end with a newline *(only for new .js / .vue files. See the Python directives below for other file types.)*
 
 Finally, avoid using `var` to declare variables. You should instead use `const` and `let`. `var` unnecessarily pollutes the global scope and there's almost no use-case where it should be used.
 
