@@ -34,7 +34,7 @@ jobs:
         uses: mr-smithers-excellent/docker-build-push@v5.6
         with:
           image: ${{ env.IMAGE_NAME }}
-          tags: nightly-${{ steps.date.outputs.date }}
+          tags: nightly-${{ steps.date.outputs.date }}, latest
           registry: ${{ env.REGISTRY }}
           dockerfile: docker/db.Dockerfile
           username: ${{ github.actor }}
