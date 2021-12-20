@@ -11,4 +11,31 @@
 </div>
 
 - [**Production Website**](https://datatracker.ietf.org)
-- 
+- [Getting Started](#getting-started)
+- [Docker Dev Environment](#docker-dev-environment)
+- [Continuous Integration](#continuous-integration)
+- [Database & Assets](#database--assets)
+
+---
+
+### Getting Started
+
+This project is following the standard **Git Feature Workflow with Develop Branch** development model. Learn how about all the various steps of the development workflow, from creating a fork to submitting a pull request, in the [Contributing](CONTRIBUTING.md) guide.
+
+> Make sure to read the [Styleguides](CONTRIBUTING.md#styleguides) section to ensure a cohesive code format across the project.
+
+You can submit bug reports, enhancement and new feature requests in the [discussions](https://github.com/ietf-tools/datatracker/discussions) area. Accepted tickets will be converted to issues.
+
+### Docker Dev Environment
+
+In order to simplify and reduce the time required for setup, a preconfigured docker environment is available.
+
+Read the [Docker Dev Environment](docker/README.md) guide to get started.
+
+### Continuous Integration
+
+TODO
+
+### Database & Assets
+
+TODO
