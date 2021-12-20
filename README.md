@@ -103,7 +103,7 @@ urlpatterns += patterns('',
 Assuming you have the database settings configured already, you can run the server locally with:
 
 ```sh
- $ ietf/manage.py runserver localhost:<port>`
+ $ ietf/manage.py runserver localhost:<port>
  ```
 where `<port>` is arbitrary. Then connect your web browser to `localhost:<port>` and provide the URL to see your work.
 
