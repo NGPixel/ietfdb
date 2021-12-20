@@ -20,7 +20,7 @@
 
 ### Getting Started
 
-This project is following the standard **Git Feature Workflow with Develop Branch** development model. Learn how about all the various steps of the development workflow, from creating a fork to submitting a pull request, in the [Contributing](CONTRIBUTING.md) guide.
+This project is following the standard **Git Feature Workflow with Develop Branch** development model. Learn about all the various steps of the development workflow, from creating a fork to submitting a pull request, in the [Contributing](CONTRIBUTING.md) guide.
 
 > Make sure to read the [Styleguides](CONTRIBUTING.md#styleguides) section to ensure a cohesive code format across the project.
 
